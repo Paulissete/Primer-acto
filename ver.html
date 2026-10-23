@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#fbf3e4">
+<link rel="icon" href="icon-192.png">
+<title>Primer Acto | Vista de solo lectura</title>
+<style>
+:root{--cream:#fbf3e4;--card:#fffaf0;--line:#eadfc8;--ink:#2f3b33;--muted:#7b8a7f;--green:#3f8d66;--green-d:#2f7352;--green-p:#dcefdf;--yellow:#fbe3a1;--yellow-d:#8a6410;--rose:#f4c6c6;--rose-d:#a33d3d;--blue-p:#d9e8f2}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--cream);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;font-size:16px;-webkit-text-size-adjust:100%}
+body{padding:calc(12px + env(safe-area-inset-top)) 12px calc(24px + env(safe-area-inset-bottom))}
+.wrap{max-width:720px;margin:0 auto}
+.brand{font-family:"Snell Roundhand","Apple Chancery",Georgia,serif;font-style:italic;font-size:34px;color:var(--green-d);line-height:1;text-align:center}
+.sub{color:var(--muted);font-size:13px;text-align:center;margin-top:4px}
+.badge{display:inline-block;margin:10px auto 0;background:var(--blue-p);color:#3c6685;border-radius:99px;padding:4px 12px;font-size:13px;font-weight:700}
+.center{text-align:center}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.tile b{font-size:24px;display:block}.tile span{font-size:12px;color:var(--muted)}
+input{width:100%;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;margin-bottom:10px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:100%}
+th,td{padding:9px 8px;border-bottom:1px solid var(--line);font-size:14px;text-align:center;white-space:nowrap}
+th{background:#f3ead4;font-size:12px;color:#5d6a60;position:sticky;top:0}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card);z-index:1;min-width:150px;max-width:170px;overflow:hidden;text-overflow:ellipsis;font-weight:600;border-right:1px solid var(--line)}
+th:first-child{background:#f3ead4;z-index:2}
+tr:last-child td{border-bottom:0}
+.p{background:var(--green-p);color:var(--green-d)}.d{background:var(--yellow);color:var(--yellow-d)}.a{background:var(--rose);color:var(--rose-d)}.s{background:var(--blue-p);color:#3c6685}
+.c{display:inline-block;border-radius:99px;padding:2px 9px;font-size:12px;font-weight:700;min-width:56px}
+.nada{color:#b8ad95}
+.legend{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:12px 0 4px}
+.msg{text-align:center;padding:40px 16px;color:var(--muted)}
+button{border:0;border-radius:12px;padding:12px 16px;font-size:16px;font-weight:600;background:var(--green-p);color:var(--green-d);margin:10px auto;display:block}
+.foot{font-size:12px;color:var(--muted);text-align:center;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Primer Acto</div>
+  <div class="sub">Colectivo de Artes Escénicas y Cultura</div>
+  <div class="center"><span class="badge">👁️ Vista de solo lectura</span></div>
+  <div id="out"><div class="msg">Cargando…</div></div>
+</div>
+<script>
+(function(){
+'use strict';
+var URL_='https://duujepcbjkytxpskxhxj.supabase.co';
+var KEY_='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1dWplcGNiamt5dHhwc2t4aHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NTkzOTAsImV4cCI6MjEwMTUzNTM5MH0.TT1dP4HYA0Zb2Bu-Wz5o-noPRcBudMeTROvOWce3pRU';
+var out=document.getElementById('out'), data=null, q='';
+var DOW=['dom','lun','mar','mié','jue','vie','sáb'],MON=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function clp(n){return '$'+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.')}
+function sd(s){var p=s.split('-'),d=new Date(+p[0],+p[1]-1,+p[2]);return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]}
+var CELL={p:'<span class="c p">✓ Pagó</span>',d:'<span class="c d">⏳ Debe</span>',a:'<span class="c a">✕ Ausente</span>',s:'<span class="c s">☂ Suspendida</span>','':'<span class="nada">—</span>'};
+function load(){
+  var code=(location.hash||'').replace('#','').trim();
+  if(!code){out.innerHTML='<div class="msg">Este enlace está incompleto. Pide a quien te lo envió que lo comparta de nuevo.</div>';return}
+  out.innerHTML='<div class="msg">Cargando…</div>';
+  fetch(URL_+'/rest/v1/rpc/pa_view',{method:'POST',headers:{'apikey':KEY_,'Authorization':'Bearer '+KEY_,'Content-Type':'application/json'},body:JSON.stringify({p_code:code})})
+   .then(function(r){if(!r.ok)throw new Error('http');return r.json()})
+   .then(function(j){ if(!j){out.innerHTML='<div class="msg">Este enlace no es válido o fue desactivado.<br>Pide uno nuevo a quien administra la planilla.</div>';return} data=j;draw()})
+   .catch(function(){out.innerHTML='<div class="msg">No se pudo cargar. Revisa tu conexión.</div><button id="retry">Reintentar</button>';var b=document.getElementById('retry');if(b)b.onclick=load});
+}
+function draw(){
+  var d=data, ses=d.sessions||[], mem=(d.members||[]).filter(function(m){return !q||m.n.toLowerCase().indexOf(q)>=0});
+  var upd=new Date(d.updated);
+  var head='<tr><th>Nombre</th>'+ses.map(function(s){return '<th>'+sd(s.date)+'</th>'}).join('')+'<th>Debe</th></tr>';
+  var rows=mem.map(function(m){return '<tr><td title="'+esc(m.n)+'">'+esc(m.n)+(m.active?'':' <span class="nada">(inactivo)</span>')+'</td>'+ses.map(function(s){return '<td>'+(CELL[m.marks[s.date]||'']||CELL[''])+'</td>'}).join('')+'<td>'+(m.debt?'<span class="c d">'+clp(m.debt)+'</span>':'<span class="c p">Al día</span>')+'</td></tr>'}).join('');
+  out.innerHTML='<div class="grid"><div class="tile"><b>'+clp(d.totals.recaudadoMes)+'</b><span>Recaudado en el mes</span></div><div class="tile"><b>'+clp(d.totals.deudaTotal)+'</b><span>Deudas pendientes</span></div></div>'
+   +'<input id="q" type="search" placeholder="Buscar nombre…" value="'+esc(q)+'">'
+   +'<div class="scroll"><table>'+head+(rows||'<tr><td colspan="'+(ses.length+2)+'" class="nada" style="text-align:center">Sin resultados</td></tr>')+'</table></div>'
+   +'<div class="legend"><span class="c p">✓ Pagó</span><span class="c d">⏳ Debe</span><span class="c a">✕ Ausente</span><span class="c s">☂ Suspendida</span></div>'
+   +'<div class="foot">Cuota semanal: '+clp(d.fee)+' · Actualizado el '+upd.toLocaleDateString('es-CL')+' a las '+upd.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})+'</div>'
+   +'<button id="refresh">Actualizar</button>';
+  document.getElementById('refresh').onclick=load;
+  var qi=document.getElementById('q');
+  qi.oninput=function(){q=qi.value.trim().toLowerCase();var p=qi.selectionStart;draw();var n=document.getElementById('q');n.focus();n.setSelectionRange(p,p)};
+}
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&data)load()});
+window.addEventListener('hashchange',load);
+load();
+})();
+</script>
+</body>
+</html>

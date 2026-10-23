@@ -8,7 +8,8 @@
       settings: { fee: 500, place: '', time: '18:30', weekday: 5, confirm: true, showInactive: false },
       members: [],
       sessions: {},   // { 'YYYY-MM-DD': { status:'realizada'|'suspendida', fee:500, marks:{ memberId:'pago'|'debe'|'ausente' } } }
-      payments: []    // { id, memberId, date, amount, method, note, allocs:[{date, amount}] }
+      payments: [],   // { id, memberId, date, amount, method, note, allocs:[{date, amount}] }
+      cash: []        // fondo: { id, type:'inicial'|'ingreso'|'gasto', date, amount, note }
     };
   }
 
@@ -167,6 +168,69 @@
     return t;
   }
 
+  /* Fondo del taller = saldo inicial + cuotas y abonos recibidos desde la fecha del saldo inicial
+     + otros ingresos − gastos. Las deudas pendientes NO cuentan (no es dinero recibido). */
+  function fundSummary(state) {
+    var cash = state.cash || [];
+    var open = cash.filter(function (c) { return c.type === 'inicial'; })[0];
+    var since = open ? open.date : '0000-00-00';
+    var cuotas = 0, otros = 0, gastos = 0;
+    Object.keys(state.sessions).forEach(function (d) {
+      var s = state.sessions[d];
+      if (d < since || s.status === 'suspendida') return;
+      Object.keys(s.marks).forEach(function (id) { if (s.marks[id] === 'pago') cuotas += s.fee; });
+    });
+    state.payments.forEach(function (p) { if (p.date >= since) cuotas += p.amount; });
+    cash.forEach(function (c) {
+      if (c.type === 'inicial' || c.date < since) return;
+      if (c.type === 'ingreso') otros += c.amount; else if (c.type === 'gasto') gastos += c.amount;
+    });
+    var inicial = open ? open.amount : 0;
+    return { inicial: inicial, since: open ? open.date : null, cuotas: cuotas, otros: otros, gastos: gastos, total: inicial + cuotas + otros - gastos };
+  }
+  function addCash(state, o) {
+    var amount = Math.round(Number(o.amount));
+    if (['inicial', 'ingreso', 'gasto'].indexOf(o.type) < 0) return { ok: false, error: 'Elige el tipo de movimiento.' };
+    if (!(amount > 0)) return { ok: false, error: 'El monto debe ser mayor a $0.' };
+    if (!o.date) return { ok: false, error: 'Falta la fecha.' };
+    if (!state.cash) state.cash = [];
+    if (o.type === 'inicial') state.cash = state.cash.filter(function (c) { return c.type !== 'inicial'; });
+    var c = { id: uid(), type: o.type, date: o.date, amount: amount, note: o.note || '' };
+    state.cash.push(c);
+    return { ok: true, cash: c };
+  }
+  function deleteCash(state, id) { state.cash = (state.cash || []).filter(function (c) { return c.id !== id; }); }
+
+  /* Vista pública (solo lectura): nombre, estado por sesión y totales.
+     NO incluye el fondo, las notas, los medios de pago ni el detalle de abonos. */
+  function buildSnapshot(state) {
+    var dates = Object.keys(state.sessions).sort().slice(-8);
+    var lastYm = dates.length ? dates[dates.length - 1].slice(0, 7) : '';
+    var members = state.members.slice().sort(byName).map(function (m) {
+      var bal = balanceOf(state, m.id);
+      return { m: m, bal: bal };
+    }).filter(function (x) { return x.m.active || x.bal > 0; }).map(function (x) {
+      var marks = {};
+      dates.forEach(function (d) {
+        var s = state.sessions[d];
+        marks[d] = s.status === 'suspendida' ? 's' : ({ pago: 'p', debe: 'd', ausente: 'a' }[s.marks[x.m.id]] || '');
+      });
+      return { n: (x.m.first + ' ' + x.m.last).trim(), debt: x.bal, active: x.m.active, marks: marks };
+    });
+    return {
+      updated: new Date().toISOString(),
+      fee: state.settings.fee,
+      place: state.settings.place || '',
+      time: state.settings.time || '',
+      sessions: dates.map(function (d) {
+        var st = sessionStats(state, d);
+        return { date: d, status: state.sessions[d].status, pagaron: st.pagaron, deben: st.deben, ausentes: st.ausentes, recaudado: st.recaudado };
+      }),
+      members: members,
+      totals: { deudaTotal: totalDebt(state), recaudadoMes: lastYm ? monthCollected(state, lastYm) : 0, mes: lastYm }
+    };
+  }
+
   function weekStart(date) { // lunes de la semana
     var d = parseYmd(date), dow = (d.getDay() + 6) % 7;
     d.setDate(d.getDate() - dow); return ymd(d);
@@ -257,8 +321,13 @@
       rows.push(['Abono', p.date, name(p.memberId), METHODS[p.method] || p.method, p.amount,
         (p.allocs.map(function (a) { return a.date + ': ' + a.amount; }).join(' | ')) + (p.note ? ' — ' + p.note : '')]);
     });
+    var TIPO = { inicial: 'Fondo: saldo inicial', ingreso: 'Fondo: otro ingreso', gasto: 'Fondo: gasto' };
+    (state.cash || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (c) {
+      rows.push([TIPO[c.type], c.date, '', '', c.type === 'gasto' ? -c.amount : c.amount, c.note || '']);
+    });
     rows.push([]);
     rows.push(['Deuda pendiente total', '', '', '', totalDebt(state), '']);
+    rows.push(['Fondo del taller actual', '', '', '', fundSummary(state).total, '']);
     return toCsv(rows);
   }
 
@@ -269,7 +338,8 @@
     debtsOf: debtsOf, balanceOf: balanceOf, totalDebt: totalDebt, setMark: setMark, setStatus: setStatus, addPayment: addPayment,
     deletePayment: deletePayment, sessionStats: sessionStats, monthCollected: monthCollected, collectedByWeek: collectedByWeek,
     memberHistory: memberHistory, absences: absences, toCsv: toCsv, parseCsv: parseCsv, exportMembersCsv: exportMembersCsv,
-    importMembersCsv: importMembersCsv, exportReportCsv: exportReportCsv, clp: clp, METHODS: METHODS };
+    importMembersCsv: importMembersCsv, exportReportCsv: exportReportCsv, clp: clp, METHODS: METHODS,
+    fundSummary: fundSummary, addCash: addCash, deleteCash: deleteCash, buildSnapshot: buildSnapshot };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PA = api;
 })(typeof window !== 'undefined' ? window : globalThis);

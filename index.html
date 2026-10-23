@@ -116,7 +116,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 var KEY='primerActo.v1', META='primerActo.meta';
 var S=load();
 var today=PA.ymd(new Date());
-var ui={tab:'home',memberId:null,mtab:'hist',q:'',filter:'activos',date:PA.nextSessionDate(S,new Date()),
+var ui={cash:{type:'inicial',amount:'',date:today,note:''},tab:'home',memberId:null,mtab:'hist',q:'',filter:'activos',date:PA.nextSessionDate(S,new Date()),
         rep:{ym:today.slice(0,7),member:''},pay:{memberId:'',target:'oldest',method:'efectivo',amount:'',date:today,note:''},screen:null,edit:null};
 
 /* ---------- almacenamiento ---------- */
@@ -124,11 +124,78 @@ function load(){
   try{var raw=localStorage.getItem(KEY); if(raw){var d=JSON.parse(raw); return migrate(d);}}catch(e){}
   return PA.newState();
 }
-function migrate(d){var b=PA.newState(); d.settings=Object.assign(b.settings,d.settings||{}); d.members=d.members||[]; d.sessions=d.sessions||{}; d.payments=d.payments||[]; d.v=1; return d;}
+function migrate(d){var b=PA.newState(); d.settings=Object.assign(b.settings,d.settings||{}); d.members=d.members||[]; d.sessions=d.sessions||{}; d.payments=d.payments||[]; d.cash=d.cash||[]; d.v=1; return d;}
 function save(){
   try{ localStorage.setItem(KEY,JSON.stringify(S)); localStorage.setItem(KEY+'.copy',JSON.stringify(S)); markDirty(); }
   catch(e){ toast('⚠️ No se pudo guardar. Exporta un respaldo.'); }
+  schedulePush();
 }
+
+/* ---------- nube (opcional): respaldo automático y enlace de solo lectura ----------
+   Solo quien tiene la CLAVE DE EDICIÓN puede guardar datos. Quien recibe el enlace solo puede ver. */
+var CLOUD={url:'https://duujepcbjkytxpskxhxj.supabase.co',key:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1dWplcGNiamt5dHhwc2t4aHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NTkzOTAsImV4cCI6MjEwMTUzNTM5MH0.TT1dP4HYA0Zb2Bu-Wz5o-noPRcBudMeTROvOWce3pRU'};
+var CK='primerActo.cloud', pushTimer=null, pushing=false, skipPush=false, ver=0;
+function cget(){try{return JSON.parse(localStorage.getItem(CK))||{}}catch(e){return {}}}
+function cset(o){try{localStorage.setItem(CK,JSON.stringify(o))}catch(e){}}
+function rpc(fn,args){
+  return fetch(CLOUD.url+'/rest/v1/rpc/'+fn,{method:'POST',headers:{'apikey':CLOUD.key,'Authorization':'Bearer '+CLOUD.key,'Content-Type':'application/json'},body:JSON.stringify(args)})
+    .then(function(r){return r.json().catch(function(){return null}).then(function(j){ if(!r.ok) throw new Error((j&&j.message)||('Error '+r.status)); return j; })});
+}
+function cloudStatusHtml(){
+  var c=cget(); if(!c.key) return 'Sin conectar';
+  if(c.pending) return '⚠️ Cambios pendientes de subir. Se subirán solos al volver la conexión.';
+  return '☁️ Guardado en la nube'+(c.last?' · '+new Date(c.last).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}):'');
+}
+function refreshCloudStatus(){var e=$('#cloudst');if(e)e.innerHTML=cloudStatusHtml();var h=$('#cloudst2');if(h)h.innerHTML=cloudStatusHtml();}
+function schedulePush(){
+  var c=cget(); if(!c.key||skipPush) return;
+  ver++; c.pending=true; cset(c); refreshCloudStatus();
+  clearTimeout(pushTimer); pushTimer=setTimeout(function(){pushCloud()},1500);
+}
+function pushCloud(manual){
+  var c=cget(); if(!c.key) return Promise.resolve();
+  if(pushing){ clearTimeout(pushTimer); pushTimer=setTimeout(function(){pushCloud(manual)},800); return Promise.resolve(); }
+  pushing=true; var v=ver;
+  return rpc('pa_save',{p_key:c.key,p_state:S,p_snapshot:PA.buildSnapshot(S)}).then(function(){
+    pushing=false; var c2=cget(); c2.last=Date.now();
+    if(v===ver){c2.pending=false}else{clearTimeout(pushTimer);pushTimer=setTimeout(function(){pushCloud()},300)}
+    cset(c2); if(manual)toast('☁️ Guardado en la nube'); refreshCloudStatus();
+  }).catch(function(e){
+    pushing=false; var c2=cget(); c2.pending=true; cset(c2);
+    if(manual)toast('No se pudo guardar en la nube: '+e.message); refreshCloudStatus();
+  });
+}
+function cloudConnect(){
+  var key=(($('#c_key')||{}).value||'').trim().toUpperCase();
+  if(!key) return toast('Pega la clave de edición.');
+  toast('Conectando…');
+  rpc('pa_connect',{p_key:key}).then(function(r){
+    cset({key:key,share:r.share_code,last:null,pending:false});
+    if(r.has_state){
+      var n=S.members.length;
+      if(n&&!confirm('La nube ya tiene datos guardados. ¿Traerlos a este teléfono? Reemplazarán los '+n+' integrantes que hay aquí (queda una copia de seguridad).')){ render(); return; }
+      return cloudPull();
+    }
+    return pushCloud(true).then(render);
+  }).catch(function(e){ toast(/clave/i.test(e.message)?'Clave incorrecta. Revísala e inténtalo de nuevo.':'No se pudo conectar: '+e.message); });
+}
+function cloudPull(){
+  var c=cget();
+  return rpc('pa_load',{p_key:c.key}).then(function(r){
+    if(!r||!r.state) throw new Error('la nube está vacía');
+    try{localStorage.setItem(KEY+'.prerestore',JSON.stringify(S))}catch(e){}
+    S=migrate(r.state); skipPush=true; save(); skipPush=false;
+    var c2=cget(); c2.pending=false; c2.last=Date.now(); cset(c2);
+    ui.date=PA.nextSessionDate(S,new Date()); ui.screen=null; ui.tab='home';
+    toast('✓ Datos traídos de la nube ('+S.members.length+' integrantes)'); render();
+  }).catch(function(e){ toast('No se pudo traer: '+e.message); });
+}
+function shareUrl(){var c=cget();return location.href.split('#')[0].replace(/[^\/]*$/,'')+'ver.html#'+c.share}
+function copyText(t){
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){toast('Enlace copiado')},function(){prompt('Copia el enlace:',t)})}
+  else prompt('Copia el enlace:',t);
+}
+window.addEventListener('online',function(){var c=cget();if(c.key&&c.pending)pushCloud()});
 function meta(){try{return JSON.parse(localStorage.getItem(META))||{}}catch(e){return {}}}
 function markDirty(){var m=meta(); m.dirty=(m.dirty||0)+1; try{localStorage.setItem(META,JSON.stringify(m))}catch(e){}}
 function markBackup(){var m=meta(); m.last=Date.now(); m.dirty=0; localStorage.setItem(META,JSON.stringify(m));}
@@ -163,7 +230,7 @@ function vHome(){
   var m=meta(), warn='';
   if(S.members.length||Object.keys(S.sessions).length){
     var days=m.last?Math.floor((Date.now()-m.last)/864e5):null;
-    if((m.dirty||0)>0&&(days===null||days>=7)) warn='<div class="warnbox">💾 <b>'+(days===null?'Aún no has hecho un respaldo.':'Hace '+days+' días que no haces un respaldo.')+'</b> Toca aquí para descargarlo.<div class="btns"><button class="btn sec sm" data-a="backup">Descargar respaldo</button></div></div>';
+    if(!cget().key&&(m.dirty||0)>0&&(days===null||days>=7)) warn='<div class="warnbox">💾 <b>'+(days===null?'Aún no has hecho un respaldo.':'Hace '+days+' días que no haces un respaldo.')+'</b> Toca aquí para descargarlo.<div class="btns"><button class="btn sec sm" data-a="backup">Descargar respaldo</button></div></div>';
   }
   var sesTxt=st.suspendida?'<span class="pill p-suspendida">Suspendida</span>':'';
   return '<div style="text-align:center;margin:4px 0 12px"><div class="brand">Primer Acto</div><div class="sub">Colectivo de Artes Escénicas y Cultura</div></div>'
@@ -180,6 +247,7 @@ function vHome(){
   +'<div class="tile"><div class="ic i-y">🧾</div><div><b>'+clp(PA.totalDebt(S))+'</b><span>Deudas pendientes totales</span></div></div>'
   +'<div class="tile"><div class="ic i-b">📊</div><div><b>'+clp(PA.monthCollected(S,ym))+'</b><span>Recaudado en el mes</span></div></div>'
   +'</div>'
+  +'<button class="item card" style="margin-bottom:12px" data-a="fund"><div class="avatar i-g" style="font-size:20px">🏦</div><div class="grow"><div class="sub">Fondo del taller</div><b style="font-size:24px;color:var(--green-d)">'+clp(PA.fundSummary(S).total)+'</b><div class="sub">'+(S.cash.some(function(c){return c.type==="inicial"})?'Saldo inicial + cuotas recibidas − gastos':'Toca para ingresar el saldo inicial')+'</div></div><span class="chev">›</span></button>'
   +'<div class="sub" style="margin:-2px 2px 12px">Lo recaudado es dinero recibido. Las deudas pendientes aún no se han pagado y no se suman a lo recaudado.</div>'
   +'<button class="btn" data-a="goSession">Controlar sesión ›</button>'
   +'<div class="grid2" style="margin-top:12px">'
@@ -188,6 +256,7 @@ function vHome(){
   +'<button class="btn sec" data-a="debts">🧾 Revisar deudas</button>'
   +'<button class="btn sec" data-a="tab" data-v="reports">🗂️ Ver historial</button>'
   +'</div>'
+  +(cget().key?'<div class="sub" id="cloudst2" style="text-align:center;margin-top:10px">'+cloudStatusHtml()+'</div>':'')
   +'<div style="text-align:center;margin-top:6px"><button class="ibtn" data-a="settings" aria-label="Configuración">⚙️</button></div>';
 }
 
@@ -300,6 +369,29 @@ function vPay(){
   +'<h3 style="margin:18px 2px 8px">Últimos pagos y abonos</h3>'+(recent.length?'<div class="list">'+recent.map(payRow).join('')+'</div>':'<div class="empty">Aún no hay abonos registrados.</div>');
 }
 
+function vFund(){
+  var F=PA.fundSummary(S), C=ui.cash, hasOpen=S.cash.some(function(c){return c.type==='inicial'});
+  var TL={inicial:'Saldo inicial',ingreso:'Otro ingreso',gasto:'Gasto'};
+  var mv=S.cash.slice().sort(function(a,b){return a.date<b.date?1:-1});
+  return header('Fondo del taller',true)
+  +'<div class="card" style="text-align:center"><div class="sub">Fondo actual</div><b style="font-size:34px;color:var(--green-d)">'+clp(F.total)+'</b></div>'
+  +'<div class="list">'
+  +'<div class="item"><span class="grow">Saldo inicial'+(F.since?'<div class="sub">al '+fdate(F.since)+'</div>':'')+'</span><b>'+clp(F.inicial)+'</b></div>'
+  +'<div class="item"><span class="grow">+ Cuotas y abonos recibidos<div class="sub">desde esa fecha, automático</div></span><b class="tag-g">'+clp(F.cuotas)+'</b></div>'
+  +'<div class="item"><span class="grow">+ Otros ingresos</span><b>'+clp(F.otros)+'</b></div>'
+  +'<div class="item"><span class="grow">− Gastos</span><b style="color:var(--rose-d)">'+clp(F.gastos)+'</b></div></div>'
+  +'<div class="sub" style="margin:0 2px 12px">Las deudas pendientes no cuentan: solo el dinero ya recibido.</div>'
+  +'<div class="card"><h3>Anotar movimiento</h3>'
+  +'<label>Tipo</label><select id="c_type"><option value="inicial"'+(C.type==='inicial'?' selected':'')+'>Saldo inicial (plata que ya tienen)</option><option value="ingreso"'+(C.type==='ingreso'?' selected':'')+'>Otro ingreso (rifa, aporte…)</option><option value="gasto"'+(C.type==='gasto'?' selected':'')+'>Gasto (materiales, arriendo…)</option></select>'
+  +'<label>Monto (CLP)</label><input id="c_amount" type="number" inputmode="numeric" min="0" step="1" value="'+esc(C.amount)+'">'
+  +'<label>Fecha</label><input id="c_date" type="date" value="'+C.date+'">'
+  +'<label>Detalle (opcional)</label><input id="c_note" value="'+esc(C.note)+'" placeholder="Ej: fondo acumulado a la fecha">'
+  +(hasOpen&&C.type==='inicial'?'<div class="warnbox" style="margin-top:12px">Ya hay un saldo inicial. Si guardas otro, <b>reemplaza</b> al anterior.</div>':'')
+  +'<div class="btns"><button class="btn" data-a="saveCash">Guardar</button></div></div>'
+  +'<h3 style="margin:8px 2px">Movimientos del fondo</h3>'
+  +(mv.length?'<div class="list">'+mv.map(function(c){return '<div class="item"><div class="grow"><b>'+TL[c.type]+'</b> <span class="sub">· '+fdate(c.date)+'</span>'+(c.note?'<div class="sub">“'+esc(c.note)+'”</div>':'')+'</div><b style="'+(c.type==='gasto'?'color:var(--rose-d)':'')+'">'+(c.type==='gasto'?'−':'')+clp(c.amount)+'</b><button class="btn warn sm" data-a="delCash" data-id="'+c.id+'">Quitar</button></div>'}).join('')+'</div>':'<div class="empty">Aún no hay movimientos.</div>');
+}
+
 function vDebts(){
   var rows=S.members.map(function(m){return {m:m,b:PA.balanceOf(S,m.id)}}).filter(function(x){return x.b>0}).sort(function(a,b){return b.b-a.b});
   var tot=rows.reduce(function(t,x){return t+x.b},0);
@@ -340,6 +432,23 @@ function vReports(){
   +'<div class="btns"><button class="btn" data-a="exportReport">⬇️ Exportar reporte (CSV / Excel)</button></div>';
 }
 
+function cloudCard(){
+  var c=cget();
+  if(!c.key) return '<div class="card"><h3>☁️ Nube y enlace para compartir</h3>'
+    +'<div class="sub" style="margin:6px 0 4px">Guarda una copia automática en la nube y permite compartir una vista de <b>solo lectura</b>. Solo quien tiene la clave de edición puede modificar los datos.</div>'
+    +'<label>Clave de edición</label><input id="c_key" placeholder="PA-XXXX-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">'
+    +'<div class="btns"><button class="btn" data-a="cloudConnect">Conectar este teléfono</button></div></div>';
+  return '<div class="card"><h3>☁️ Nube y enlace para compartir</h3>'
+    +'<div class="sub" id="cloudst" style="margin:6px 0 4px">'+cloudStatusHtml()+'</div>'
+    +'<div class="btns"><button class="btn" data-a="shareLink">🔗 Compartir enlace de solo lectura</button>'
+    +'<button class="btn sec" data-a="copyLink">Copiar enlace</button>'
+    +'<button class="btn sec" data-a="cloudPush">Guardar en la nube ahora</button>'
+    +'<button class="btn sec" data-a="cloudPull">Traer datos de la nube</button>'
+    +'<button class="btn sec" data-a="newShare">Crear enlace nuevo (el anterior deja de funcionar)</button>'
+    +'<button class="btn warn" data-a="cloudOff">Desconectar este teléfono</button></div>'
+    +'<div class="infobox" style="margin-top:12px">Quien reciba el enlace ve nombres, asistencia y deudas, pero no puede cambiar nada. No incluye el fondo ni los abonos. Edita desde un solo teléfono a la vez.</div></div>';
+}
+
 function vSettings(){
   var c=S.settings, m=meta();
   return header('Configuración',true)
@@ -349,8 +458,9 @@ function vSettings(){
   +'<label>Día habitual</label><select id="s_wd">'+DOW.map(function(d,i){return '<option value="'+i+'"'+(i===c.weekday?' selected':'')+'>'+cap(d)+'</option>'}).join('')+'</select>'
   +'<label>Hora habitual</label><input id="s_time" type="time" value="'+esc(c.time)+'">'
   +'<div class="switch" style="margin-top:12px"><span>Confirmar antes de suspender una sesión</span><button class="sw '+(c.confirm?'on':'')+'" data-a="toggleConfirm"></button></div></div>'
+  +cloudCard()
   +'<div class="card"><h3>Respaldo de datos</h3>'
-  +'<div class="warnbox" style="margin-top:10px"><b>Importante:</b> los datos se guardan en este iPhone (almacenamiento del navegador). Se conservan al cerrar la app y al actualizarla, pero <b>se pierden si borras los datos de Safari / “Borrar historial y datos”, si eliminas la app de la pantalla de inicio o si cambias de teléfono</b>. Descarga un respaldo cada semana y guárdalo en Archivos, iCloud o tu correo.</div>'
+  +'<div class="warnbox" style="margin-top:10px"><b>Importante:</b> los datos se guardan en este iPhone (almacenamiento del navegador). Se conservan al cerrar la app y al actualizarla, pero <b>se pierden si borras los datos de Safari / “Borrar historial y datos”, si eliminas la app de la pantalla de inicio o si cambias de teléfono</b>. Con la nube conectada tienes además una copia automática; igual descarga un respaldo de vez en cuando.</div>'
   +'<div class="sub">Último respaldo: <b>'+(m.last?new Date(m.last).toLocaleDateString('es-CL'):'nunca')+'</b></div>'
   +'<div class="btns"><button class="btn" data-a="backup">⬇️ Descargar respaldo completo (.json)</button><button class="btn sec" data-a="restore">⬆️ Restaurar desde respaldo (.json)</button><button class="btn sec" data-a="exportReport">⬇️ Exportar cuotas y pagos (CSV / Excel)</button><button class="btn sec" data-a="exportMembers">⬇️ Exportar nómina (CSV)</button><button class="btn sec" data-a="importMembers">⬆️ Importar nómina (CSV)</button></div></div>'
   +'<div class="infobox">Los CSV usan “;” como separador y se abren directamente en Excel. Si pides acceso desde otro dispositivo, puedes restaurar el respaldo .json allí.</div>';
@@ -362,6 +472,7 @@ function render(){
   else if(ui.screen==='member') v=vMember();
   else if(ui.screen==='settings') v=vSettings();
   else if(ui.screen==='debts') v=vDebts();
+  else if(ui.screen==='fund') v=vFund();
   else v={home:vHome,members:vMembers,session:vSession,pay:vPay,reports:vReports}[ui.tab]();
   var y=window.scrollY; $('#app').innerHTML=v;
   var act=ui.screen?({member:'members',memberForm:'members'}[ui.screen]||ui.tab):ui.tab;
@@ -377,6 +488,13 @@ var A={
   goSession:function(){go('session')},
   settings:function(){ui.screen='settings';render()},
   debts:function(){ui.screen='debts';render()},
+  fund:function(){ui.cash.type=S.cash.some(function(c){return c.type==='inicial'})?'ingreso':'inicial';ui.screen='fund';window.scrollTo(0,0);render()},
+  saveCash:function(){
+    var C=ui.cash; C.type=$('#c_type').value;C.amount=$('#c_amount').value;C.date=$('#c_date').value;C.note=$('#c_note').value;
+    if(C.type==='inicial'&&S.cash.some(function(c){return c.type==='inicial'})&&!confirm('Esto reemplazará el saldo inicial anterior. ¿Continuar?'))return;
+    var r=PA.addCash(S,C); if(!r.ok)return toast(r.error); save(); toast('Movimiento guardado'); C.amount='';C.note='';C.type='ingreso'; render();
+  },
+  delCash:function(e){ if(!confirm('¿Quitar este movimiento del fondo?'))return; PA.deleteCash(S,e.id);save();render()},
   filter:function(e){ui.filter=e.v;render()},
   addMember:function(){ui.edit='new';ui.screen='memberForm';render()},
   editMember:function(e){ui.edit=e.id;ui.screen='memberForm';render()},
@@ -405,6 +523,16 @@ var A={
   },
   delPay:function(e){ if(!confirm('¿Anular este pago? La deuda asociada volverá a quedar pendiente.'))return; PA.deletePayment(S,e.id);save();render()},
   repMonth:function(e){var months={};months[today.slice(0,7)]=1;Object.keys(S.sessions).forEach(function(d){months[d.slice(0,7)]=1});S.payments.forEach(function(p){months[p.date.slice(0,7)]=1});months[ui.rep.ym]=1;var ml=Object.keys(months).sort().reverse();var i=ml.indexOf(ui.rep.ym)+(+e.v);if(i>=0&&i<ml.length)ui.rep.ym=ml[i];render()},
+  cloudConnect:function(){cloudConnect()},
+  cloudPush:function(){pushCloud(true)},
+  cloudPull:function(){ if(!confirm('Se reemplazarán los datos de este teléfono por los de la nube (queda una copia de seguridad). ¿Continuar?'))return; cloudPull()},
+  shareLink:function(){var u=shareUrl(); if(navigator.share){navigator.share({title:'Primer Acto | Cuotas (solo lectura)',url:u}).catch(function(){})}else copyText(u)},
+  copyLink:function(){copyText(shareUrl())},
+  newShare:function(){
+    if(!confirm('Se creará un enlace nuevo. El anterior dejará de funcionar para todos los que lo tengan. ¿Continuar?'))return;
+    var c=cget(); rpc('pa_new_share_code',{p_key:c.key}).then(function(code){c.share=code;cset(c);toast('Enlace nuevo creado. Compártelo de nuevo.')}).catch(function(e){toast('No se pudo: '+e.message)});
+  },
+  cloudOff:function(){ if(!confirm('Este teléfono dejará de guardar en la nube. Tus datos locales se mantienen. ¿Continuar?'))return; cset({}); render()},
   toggleConfirm:function(){S.settings.confirm=!S.settings.confirm;save();render()},
   backup:function(){download('respaldo-primer-acto-'+today+'.json',JSON.stringify(S,null,1),'application/json');markBackup();toast('Respaldo descargado. Guárdalo en Archivos o iCloud.');setTimeout(render,50)},
   restore:function(){pickFile('.json,application/json',function(txt){try{var d=JSON.parse(txt);if(!d.members||!d.sessions||!d.payments)throw 0;if(!confirm('Esto reemplazará TODOS los datos actuales por los del respaldo ('+d.members.length+' integrantes). ¿Continuar?'))return;try{localStorage.setItem(KEY+'.prerestore',JSON.stringify(S))}catch(e){}S=migrate(d);save();ui.date=PA.nextSessionDate(S,new Date());toast('Respaldo restaurado');render()}catch(e){toast('Ese archivo no es un respaldo válido.')}})},
@@ -423,7 +551,8 @@ document.addEventListener('input',function(ev){
 });
 document.addEventListener('change',function(ev){
   var id=ev.target.id, v=ev.target.value;
-  if(id==='sdate'&&v){ui.date=v;render()}
+  if(id==='c_type'){ui.cash.type=v;ui.cash.amount=$('#c_amount').value;ui.cash.date=$('#c_date').value;ui.cash.note=$('#c_note').value;render()}
+  else if(id==='sdate'&&v){ui.date=v;render()}
   else if(id==='p_member'){ui.pay.memberId=v;ui.pay.target='oldest';render()}
   else if(id==='p_target'||id==='p_method'||id==='p_date'||id==='p_note'||id==='p_amount'){ui.pay[{p_target:'target',p_method:'method',p_date:'date',p_note:'note',p_amount:'amount'}[id]]=v; if(id==='p_target')render()}
   else if(id==='r_ym'){ui.rep.ym=v;render()}
@@ -434,6 +563,7 @@ document.addEventListener('change',function(ev){
   else if(id==='s_wd'){S.settings.weekday=+v;save();ui.date=PA.nextSessionDate(S,new Date())}
 });
 
+if(cget().key&&cget().pending){setTimeout(function(){pushCloud()},1200)}
 if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
 render();
 })();
