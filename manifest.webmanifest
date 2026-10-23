@@ -1,0 +1,17 @@
+{
+  "name": "Primer Acto | Cuotas y Asistencia",
+  "short_name": "Primer Acto",
+  "description": "Cuotas semanales y asistencia del taller de teatro del Colectivo Primer Acto",
+  "lang": "es-CL",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbf3e4",
+  "theme_color": "#fbf3e4",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

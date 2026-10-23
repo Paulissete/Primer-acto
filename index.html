@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#fbf3e4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Primer Acto">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Primer Acto | Cuotas y Asistencia</title>
+<style>
+:root{
+  --cream:#fbf3e4; --card:#fffaf0; --line:#eadfc8; --ink:#2f3b33; --muted:#7b8a7f;
+  --green:#3f8d66; --green-d:#2f7352; --green-p:#dcefdf;
+  --yellow:#fbe3a1; --yellow-d:#8a6410; --rose:#f4c6c6; --rose-d:#a33d3d; --blue-p:#d9e8f2;
+  --radius:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--cream);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;font-size:17px;-webkit-text-size-adjust:100%}
+body{padding-top:env(safe-area-inset-top)}
+#app{max-width:520px;margin:0 auto;min-height:100vh;padding:12px 14px calc(92px + env(safe-area-inset-bottom))}
+h1,h2,h3{margin:0}
+.brand{font-family:"Snell Roundhand","Apple Chancery",Georgia,serif;font-style:italic;font-size:34px;color:var(--green-d);line-height:1}
+.hdr{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+.hdr h2{flex:1;font-size:21px;text-align:center}
+.hdr .sp{width:44px}
+.ibtn{width:44px;height:44px;border-radius:50%;border:0;background:var(--card);box-shadow:0 1px 0 var(--line);font-size:20px;color:var(--ink)}
+.ibtn.pri{background:var(--green);color:#fff}
+.sub{color:var(--muted);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;display:flex;gap:10px;align-items:center}
+.tile .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;flex:none}
+.tile b{font-size:24px;display:block;line-height:1.1}
+.tile span{font-size:13px;color:var(--muted)}
+.big{padding:14px}
+.big b{font-size:28px;color:var(--green-d)}
+.i-g{background:var(--green-p)}.i-y{background:var(--yellow)}.i-r{background:var(--rose)}.i-b{background:var(--blue-p)}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:15px;font-size:17px;font-weight:600;background:var(--green);color:#fff;text-align:center}
+.btn:active{background:var(--green-d)}
+.btn.sec{background:var(--green-p);color:var(--green-d)}
+.btn.warn{background:var(--rose);color:var(--rose-d)}
+.btn.sm{padding:10px 14px;font-size:15px;width:auto;display:inline-block}
+.btns{display:grid;gap:10px;margin-top:10px}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.seg{display:flex;background:#efe6d2;border-radius:12px;padding:3px;gap:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:transparent;padding:10px 4px;border-radius:10px;font-size:15px;color:var(--ink);font-weight:600}
+.seg button.on{background:var(--green);color:#fff}
+.seg button.on.rose{background:#e58b8b}
+input,select,textarea{width:100%;font:inherit;font-size:17px;padding:13px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
+select{background-image:linear-gradient(45deg,transparent 50%,#777 50%),linear-gradient(135deg,#777 50%,transparent 50%);background-position:calc(100% - 20px) 55%,calc(100% - 14px) 55%;background-size:6px 6px;background-repeat:no-repeat;padding-right:36px}
+label{display:block;font-size:14px;color:var(--muted);margin:12px 0 5px;font-weight:600}
+.list{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:12px}
+.item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);background:transparent;width:100%;border-top:0;border-left:0;border-right:0;text-align:left;font:inherit;color:inherit}
+.item:last-child{border-bottom:0}
+.avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700}
+.p-pago{background:var(--green-p);color:var(--green-d)}
+.p-debe{background:var(--yellow);color:var(--yellow-d)}
+.p-ausente{background:var(--rose);color:var(--rose-d)}
+.p-exento,.p-suspendida{background:var(--blue-p);color:#3c6685}
+.p-ok{background:var(--green-p);color:var(--green-d)}
+.chev{color:#b8ad95;font-size:20px}
+.chips{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto}
+.chip{border:0;border-radius:99px;padding:9px 14px;background:#efe6d2;font-size:15px;font-weight:600;white-space:nowrap;color:var(--ink)}
+.chip.on{background:var(--green);color:#fff}
+.mrow{padding:10px 12px;border-bottom:1px solid var(--line)}
+.mrow:last-child{border-bottom:0}
+.mrow .nm{font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px}
+.mrow .nm small{font-weight:600;color:var(--yellow-d);background:var(--yellow);padding:1px 8px;border-radius:99px;font-size:12px}
+.st{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.st button{border:2px solid transparent;border-radius:12px;padding:12px 2px;font-size:15px;font-weight:700;background:#f3ecd9;color:#6b6a5c;min-height:48px}
+.st button.on.pago{background:var(--green);color:#fff}
+.st button.on.debe{background:var(--yellow);color:var(--yellow-d);border-color:#e9c75f}
+.st button.on.ausente{background:#e58b8b;color:#fff}
+.exento{padding:10px;border-radius:12px;background:var(--blue-p);color:#3c6685;font-weight:700;text-align:center}
+.sumrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.sum{border-radius:14px;padding:10px;text-align:center}
+.sum span{display:block;font-size:12px;color:#5d6a60;font-weight:600}
+.sum b{font-size:22px}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,250,240,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));display:flex;z-index:10}
+.tabs-in{display:flex;width:100%;max-width:520px;margin:0 auto}
+.tabs button{flex:1;border:0;background:none;padding:6px 0;font-size:11px;color:var(--muted);font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabs button i{font-style:normal;font-size:22px}
+.tabs button.on{color:var(--green-d)}
+.bars{display:flex;align-items:flex-end;gap:10px;height:130px;padding:6px 4px 0}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:11px;color:var(--muted)}
+.bar div{width:100%;background:#8fc7a6;border-radius:8px 8px 0 0;min-height:3px}
+.bar em{font-style:normal;font-size:11px;color:var(--ink);font-weight:700;margin-bottom:3px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom));background:#2f3b33;color:#fff;padding:12px 18px;border-radius:12px;font-size:15px;z-index:30;max-width:90%;text-align:center}
+.warnbox{background:#fdf0cf;border:1px solid #ecd79b;border-radius:14px;padding:12px;font-size:14px;margin-bottom:12px;color:#6b520f}
+.infobox{background:var(--blue-p);border-radius:14px;padding:12px;font-size:14px;margin-bottom:12px;color:#3c5970}
+.switch{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.sw{width:52px;height:30px;border-radius:99px;background:#d6cdb6;border:0;position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.15s}
+.sw.on{background:var(--green)}.sw.on::after{left:25px}
+.empty{text-align:center;color:var(--muted);padding:26px 10px}
+.right{text-align:right}
+.mut{color:var(--muted)}
+.tag-g{color:var(--green-d);font-weight:700}.tag-y{color:var(--yellow-d);font-weight:700}
+hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="tabs"><div class="tabs-in" id="tabs"></div></nav>
+<script src="logic.js"></script>
+<script>
+(function(){
+'use strict';
+var KEY='primerActo.v1', META='primerActo.meta';
+var S=load();
+var today=PA.ymd(new Date());
+var ui={tab:'home',memberId:null,mtab:'hist',q:'',filter:'activos',date:PA.nextSessionDate(S,new Date()),
+        rep:{ym:today.slice(0,7),member:''},pay:{memberId:'',target:'oldest',method:'efectivo',amount:'',date:today,note:''},screen:null,edit:null};
+
+/* ---------- almacenamiento ---------- */
+function load(){
+  try{var raw=localStorage.getItem(KEY); if(raw){var d=JSON.parse(raw); return migrate(d);}}catch(e){}
+  return PA.newState();
+}
+function migrate(d){var b=PA.newState(); d.settings=Object.assign(b.settings,d.settings||{}); d.members=d.members||[]; d.sessions=d.sessions||{}; d.payments=d.payments||[]; d.v=1; return d;}
+function save(){
+  try{ localStorage.setItem(KEY,JSON.stringify(S)); localStorage.setItem(KEY+'.copy',JSON.stringify(S)); markDirty(); }
+  catch(e){ toast('⚠️ No se pudo guardar. Exporta un respaldo.'); }
+}
+function meta(){try{return JSON.parse(localStorage.getItem(META))||{}}catch(e){return {}}}
+function markDirty(){var m=meta(); m.dirty=(m.dirty||0)+1; try{localStorage.setItem(META,JSON.stringify(m))}catch(e){}}
+function markBackup(){var m=meta(); m.last=Date.now(); m.dirty=0; localStorage.setItem(META,JSON.stringify(m));}
+if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(function(){});}
+
+/* ---------- utilidades ---------- */
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+var clp=PA.clp;
+var DOW=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+var MON=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function fdate(s,long){var d=PA.parseYmd(s); return long?(DOW[d.getDay()]+' '+d.getDate()+' de '+MON[d.getMonth()]):(d.getDate()+' '+MON[d.getMonth()].slice(0,3)+' '+d.getFullYear());}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+function fmonth(ym){var p=ym.split('-');return cap(MON[+p[1]-1])+' '+p[0]}
+function full(m){return (m.first+' '+m.last).trim()}
+function inits(m){return ((m.first[0]||'')+(m.last[0]||'')).toUpperCase()}
+var COLORS=['#f6d0c8','#d7e8d2','#fbe3a1','#d9e8f2','#e6d3ee','#fbd5b0'];
+function avatar(m){var i=0;for(var k=0;k<m.id.length;k++)i+=m.id.charCodeAt(k);return '<div class="avatar" style="background:'+COLORS[i%COLORS.length]+'">'+esc(inits(m))+'</div>'}
+var ICON={pago:'✓',debe:'⏳',ausente:'✕',exento:'☂'}, LABEL={pago:'Pagó',debe:'Debe',ausente:'Ausente',exento:'Exento',suspendida:'Suspendida'};
+function toast(t){var e=document.createElement('div');e.className='toast';e.textContent=t;document.body.appendChild(e);setTimeout(function(){e.remove()},2600)}
+function download(name,text,type){var b=new Blob([text],{type:type||'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){a.remove();URL.revokeObjectURL(a.href)},500)}
+function pickFile(accept,cb){var i=document.createElement('input');i.type='file';i.accept=accept;i.onchange=function(){var f=i.files[0];if(!f)return;var r=new FileReader();r.onload=function(){cb(r.result,f)};r.readAsText(f)};i.click()}
+
+/* ---------- vistas ---------- */
+function header(title,back,right){
+  return '<div class="hdr">'+(back?'<button class="ibtn" data-a="back">‹</button>':'<div class="sp"></div>')+'<h2>'+title+'</h2>'+(right||'<div class="sp"></div>')+'</div>';
+}
+function tile(ic,cls,v,l){return '<div class="tile"><div class="ic '+cls+'">'+ic+'</div><div><b>'+v+'</b><span>'+l+'</span></div></div>'}
+
+function vHome(){
+  var date=ui.date, st=PA.sessionStats(S,date), ym=date.slice(0,7);
+  var m=meta(), warn='';
+  if(S.members.length||Object.keys(S.sessions).length){
+    var days=m.last?Math.floor((Date.now()-m.last)/864e5):null;
+    if((m.dirty||0)>0&&(days===null||days>=7)) warn='<div class="warnbox">💾 <b>'+(days===null?'Aún no has hecho un respaldo.':'Hace '+days+' días que no haces un respaldo.')+'</b> Toca aquí para descargarlo.<div class="btns"><button class="btn sec sm" data-a="backup">Descargar respaldo</button></div></div>';
+  }
+  var sesTxt=st.suspendida?'<span class="pill p-suspendida">Suspendida</span>':'';
+  return '<div style="text-align:center;margin:4px 0 12px"><div class="brand">Primer Acto</div><div class="sub">Colectivo de Artes Escénicas y Cultura</div></div>'
+  +warn
+  +'<button class="item card" style="margin-bottom:12px" data-a="goSession"><div class="avatar i-y" style="font-size:20px">📅</div><div class="grow"><div class="sub">'+(date===PA.nextSessionDate(S,new Date())?'Próxima sesión':'Sesión seleccionada')+'</div><b>'+cap(fdate(date,true))+'</b> '+sesTxt+'<div class="sub">'+esc(S.settings.time)+' hrs'+(S.settings.place?' · '+esc(S.settings.place):'')+'</div></div><span class="chev">›</span></button>'
+  +'<div class="grid2">'
+  +tile('👤','i-g',S.members.filter(function(x){return x.active}).length,'Integrantes activos')
+  +tile('💰','i-g',st.pagaron,'Pagaron esta sesión')
+  +tile('📋','i-y',st.deben,'Pendientes de pago')
+  +tile('✕','i-r',st.ausentes,'Ausentes')
+  +'</div>'
+  +'<div class="tile big" style="margin-bottom:10px"><div class="ic i-g">📈</div><div><b>'+clp(st.recaudado)+'</b><span>Recaudado en la sesión (cuotas '+clp(st.cuotasCobradas)+' + abonos '+clp(st.abonos)+')</span></div></div>'
+  +'<div class="grid2">'
+  +'<div class="tile"><div class="ic i-y">🧾</div><div><b>'+clp(PA.totalDebt(S))+'</b><span>Deudas pendientes totales</span></div></div>'
+  +'<div class="tile"><div class="ic i-b">📊</div><div><b>'+clp(PA.monthCollected(S,ym))+'</b><span>Recaudado en el mes</span></div></div>'
+  +'</div>'
+  +'<div class="sub" style="margin:-2px 2px 12px">Lo recaudado es dinero recibido. Las deudas pendientes aún no se han pagado y no se suman a lo recaudado.</div>'
+  +'<button class="btn" data-a="goSession">Controlar sesión ›</button>'
+  +'<div class="grid2" style="margin-top:12px">'
+  +'<button class="btn sec" data-a="tab" data-v="members">👥 Ver nómina</button>'
+  +'<button class="btn sec" data-a="tab" data-v="pay">💵 Registrar pago</button>'
+  +'<button class="btn sec" data-a="debts">🧾 Revisar deudas</button>'
+  +'<button class="btn sec" data-a="tab" data-v="reports">🗂️ Ver historial</button>'
+  +'</div>'
+  +'<div style="text-align:center;margin-top:6px"><button class="ibtn" data-a="settings" aria-label="Configuración">⚙️</button></div>';
+}
+
+function vMembers(){
+  var list=S.members.slice().sort(PA.byName), act=list.filter(function(m){return m.active}).length, ina=list.length-act;
+  var q=ui.q.trim().toLowerCase();
+  var shown=list.filter(function(m){
+    if(ui.filter==='activos'&&!m.active)return false;
+    if(ui.filter==='inactivos'&&m.active)return false;
+    return !q||full(m).toLowerCase().indexOf(q)>=0;
+  });
+  return header('Integrantes',false,'<button class="ibtn pri" data-a="addMember">＋</button>')
+  +'<input id="q" type="search" placeholder="Buscar integrante…" value="'+esc(ui.q)+'" style="margin-bottom:10px">'
+  +'<div class="chips">'
+  +'<button class="chip '+(ui.filter==='todos'?'on':'')+'" data-a="filter" data-v="todos">Todos ('+list.length+')</button>'
+  +'<button class="chip '+(ui.filter==='activos'?'on':'')+'" data-a="filter" data-v="activos">Activos ('+act+')</button>'
+  +'<button class="chip '+(ui.filter==='inactivos'?'on':'')+'" data-a="filter" data-v="inactivos">Inactivos ('+ina+')</button></div>'
+  +(shown.length?'<div class="list">'+shown.map(function(m){
+    var b=PA.balanceOf(S,m.id);
+    return '<button class="item" data-a="member" data-id="'+m.id+'">'+avatar(m)+'<div class="grow"><b>'+esc(full(m))+'</b><div class="sub">'+(m.active?'Activo':'Inactivo')+(b?' · <span class="tag-y">Debe '+clp(b)+'</span>':'')+'</div></div><span class="chev">›</span></button>';
+  }).join('')+'</div>':'<div class="empty">'+(list.length?'No hay resultados.':'Aún no hay integrantes.<br>Toca ＋ para agregar el primero o importa una nómina en CSV.')+'</div>')
+  +'<div class="btns"><button class="btn sec" data-a="importMembers">⬆️ Importar nómina (CSV)</button><button class="btn sec" data-a="exportMembers">⬇️ Exportar nómina (CSV)</button></div>';
+}
+
+function vMemberForm(){
+  var m=ui.edit==='new'?{first:'',last:'',active:true,joinDate:ui.date}:PA.memberById(S,ui.edit);
+  return header(ui.edit==='new'?'Nuevo integrante':'Editar datos',true)
+  +'<div class="card"><label>Nombre</label><input id="f_first" value="'+esc(m.first)+'" autocapitalize="words" autocomplete="off">'
+  +'<label>Apellido</label><input id="f_last" value="'+esc(m.last)+'" autocapitalize="words" autocomplete="off">'
+  +'<label>Se incorpora desde (no se cobran semanas anteriores)</label><input id="f_join" type="date" value="'+esc(m.joinDate)+'">'
+  +'<div class="infobox" style="margin-top:12px">Solo se guardan nombre y apellido. No registres datos innecesarios de menores de edad.</div></div>'
+  +'<button class="btn" data-a="saveMember">Guardar</button>';
+}
+
+function vMember(){
+  var m=PA.memberById(S,ui.memberId); if(!m){ui.screen=null;return vMembers()}
+  var b=PA.balanceOf(S,m.id), t=ui.mtab;
+  var body='';
+  if(t==='hist'){
+    var h=PA.memberHistory(S,m.id);
+    body=(h.length?'<div class="list">'+h.map(function(r){
+      return '<div class="item"><span class="grow">'+fdate(r.date)+'</span><span class="pill p-'+r.kind+'">'+ICON[r.kind==='suspendida'?'exento':r.kind]+' '+LABEL[r.kind]+'</span><b style="min-width:58px;text-align:right">'+clp(r.amount)+'</b></div>';
+    }).join('')+'</div>':'<div class="empty">Sin sesiones registradas.</div>')
+    +'<div class="sub">Ausencias: <b>'+PA.absences(S,m.id)+'</b></div>';
+  } else if(t==='debts'){
+    var d=PA.debtsOf(S,m.id), pays=S.payments.filter(function(p){return p.memberId===m.id}).sort(function(a,b){return a.date<b.date?1:-1});
+    body='<div class="card"><div class="sub">Saldo pendiente</div><b style="font-size:28px" class="'+(b?'tag-y':'tag-g')+'">'+clp(b)+'</b></div>'
+    +(d.length?'<h3 style="margin:8px 2px">Cuotas adeudadas</h3><div class="list">'+d.map(function(x){
+      return '<div class="item"><span class="grow">'+fdate(x.date)+(x.paid?'<div class="sub">Abonado '+clp(x.paid)+' de '+clp(x.fee)+'</div>':'')+'</span>'+(x.balance?'<span class="pill p-debe">Debe '+clp(x.balance)+'</span>':'<span class="pill p-ok">Pagada</span>')+'</div>';
+    }).join('')+'</div>':'')
+    +'<h3 style="margin:8px 2px">Pagos y abonos</h3>'
+    +(pays.length?'<div class="list">'+pays.map(payRow).join('')+'</div>':'<div class="empty">Sin abonos registrados.</div>');
+  } else {
+    body='<div class="list"><div class="item"><span class="grow">Incorporación</span><b>'+fdate(m.joinDate)+'</b></div>'
+    +'<div class="item"><span class="grow">Estado</span><span class="pill '+(m.active?'p-pago':'p-exento')+'">'+(m.active?'Activo':'Inactivo')+'</span></div></div>'
+    +'<div class="btns"><button class="btn sec" data-a="editMember" data-id="'+m.id+'">✏️ Editar datos</button>'
+    +'<button class="btn '+(m.active?'warn':'')+'" data-a="toggleActive" data-id="'+m.id+'">'+(m.active?'Marcar como inactivo':'Reactivar integrante')+'</button></div>'
+    +'<div class="sub" style="margin-top:10px">Al marcar como inactivo no se generan nuevas cuotas, pero se conserva todo su historial y sus deudas.</div>';
+  }
+  return header(esc(m.first),true)
+  +'<div class="row" style="margin-bottom:12px">'+avatar(m).replace('class="avatar"','class="avatar" style="width:64px;height:64px;font-size:22px;background:#f6d0c8"')+'<div><h3>'+esc(full(m))+'</h3><span class="pill '+(m.active?'p-pago':'p-exento')+'">'+(m.active?'Activo':'Inactivo')+'</span>'+(b?' <span class="pill p-debe">Debe '+clp(b)+'</span>':'')+'</div></div>'
+  +'<div class="seg"><button class="'+(t==='hist'?'on':'')+'" data-a="mtab" data-v="hist">Historial</button><button class="'+(t==='debts'?'on':'')+'" data-a="mtab" data-v="debts">Deudas</button><button class="'+(t==='data'?'on':'')+'" data-a="mtab" data-v="data">Datos</button></div>'
+  +body
+  +'<div class="btns"><button class="btn" data-a="payFor" data-id="'+m.id+'">Registrar pago</button></div>';
+}
+function payRow(p){
+  var m=PA.memberById(S,p.memberId);
+  return '<div class="item"><div class="grow"><b>'+clp(p.amount)+'</b> <span class="sub">· '+fdate(p.date)+' · '+esc(PA.METHODS[p.method]||p.method)+'</span>'
+   +(ui.tab==='pay'&&m?'<div class="sub">'+esc(full(m))+'</div>':'')
+   +'<div class="sub">Aplicado a: '+p.allocs.map(function(a){return fdate(a.date)+' ('+clp(a.amount)+')'}).join(', ')+'</div>'+(p.note?'<div class="sub">“'+esc(p.note)+'”</div>':'')+'</div>'
+   +'<button class="btn warn sm" data-a="delPay" data-id="'+p.id+'">Anular</button></div>';
+}
+
+function vSession(){
+  var date=ui.date, s=S.sessions[date], susp=s&&s.status==='suspendida', st=PA.sessionStats(S,date), ro=PA.roster(S,date);
+  var fee=s?s.fee:S.settings.fee;
+  var h=header('Control semanal',false,'<div class="sp"></div>')
+   +'<div class="card"><label style="margin-top:0">Fecha de la sesión</label><input id="sdate" type="date" value="'+date+'"><div class="sub" style="margin-top:6px">'+cap(fdate(date,true))+'</div></div>'
+   +'<div class="seg"><button class="'+(!susp?'on':'')+'" data-a="status" data-v="realizada">Sesión realizada</button><button class="'+(susp?'on rose':'')+'" data-a="status" data-v="suspendida">Suspender sesión</button></div>';
+  if(susp){
+    return h+'<div class="card" style="text-align:center"><div style="font-size:54px">🗓️</div><h3>Sesión suspendida</h3><p class="sub">No se cobra la cuota a ningún integrante en esta fecha. Las deudas anteriores se mantienen.</p></div>'
+     +'<div class="list">'+ro.map(function(m){return '<div class="item">'+avatar(m)+'<div class="grow"><b>'+esc(full(m))+'</b></div><span class="pill p-exento">☂ Exento</span></div>'}).join('')+'</div>'
+     +'<div class="btns"><button class="btn sec" data-a="status" data-v="realizada">Reanudar sesión (marcar como realizada)</button></div>';
+  }
+  var rows=ro.map(function(m){
+    var mk=s&&s.marks[m.id], prev=PA.balanceOf(S,m.id)-((mk==='debe')?Math.max(0,fee-PA.allocatedTo(S,m.id,date)):0);
+    return '<div class="mrow"><div class="nm"><span>'+esc(full(m))+(m.active?'':' <span class="sub">(inactivo)</span>')+'</span>'+(prev>0?'<small>Deuda previa '+clp(prev)+'</small>':'')+'</div><div class="st">'
+     +['pago','debe','ausente'].map(function(k){return '<button class="'+k+(mk===k?' on':'')+'" data-a="mark" data-id="'+m.id+'" data-v="'+k+'">'+ICON[k]+' '+LABEL[k]+'</button>'}).join('')+'</div></div>';
+  }).join('');
+  return h+(ro.length?'<div class="sub" style="margin:0 2px 8px">Toca el estado de cada integrante (un segundo toque lo desmarca). Se guarda solo.</div><div class="list">'+rows+'</div>':'<div class="empty">No hay integrantes activos para esta fecha.<br>Agrégalos en “Integrantes”.</div>')
+   +'<div class="sumrow"><div class="sum i-g"><span>Recaudado</span><b>'+clp(st.recaudado)+'</b></div><div class="sum i-y"><span>Pendiente</span><b>'+clp(st.pendienteSesion)+'</b></div><div class="sum i-r"><span>Ausentes</span><b>'+st.ausentes+'</b></div></div>'
+   +'<div class="sub" style="text-align:center">✓ Guardado automáticamente · Cuota: '+clp(fee)+(st.sinMarcar?' · Sin marcar: '+st.sinMarcar:'')+'</div>'
+   +'<div class="btns"><button class="btn sec" data-a="prevDate">‹ Sesión anterior</button><button class="btn sec" data-a="nextDate">Sesión siguiente ›</button></div>';
+}
+
+function vPay(){
+  var P=ui.pay, members=S.members.slice().sort(PA.byName);
+  var m=P.memberId?PA.memberById(S,P.memberId):null, d=m?PA.debtsOf(S,m.id).filter(function(x){return x.balance>0}):[], bal=d.reduce(function(t,x){return t+x.balance},0);
+  var recent=S.payments.slice().sort(function(a,b){return a.date<b.date?1:(a.date>b.date?-1:0)}).slice(0,15);
+  return header('Registrar pago',false)
+  +'<div class="card"><label style="margin-top:0">Integrante</label><select id="p_member"><option value="">Elige un integrante…</option>'+members.map(function(x){var b=PA.balanceOf(S,x.id);return '<option value="'+x.id+'"'+(x.id===P.memberId?' selected':'')+'>'+esc(full(x))+(b?' — debe '+clp(b):'')+'</option>'}).join('')+'</select>'
+  +(m?'<div class="row" style="margin-top:10px">'+avatar(m)+'<div><b>'+esc(full(m))+'</b><div class="sub">Deuda actual: <b class="'+(bal?'tag-y':'tag-g')+'">'+clp(bal)+'</b></div></div></div>':'')
+  +(m&&!bal?'<div class="infobox" style="margin-top:10px">Esta persona no tiene deudas pendientes. Si pagó hoy en la sesión, márcala como “Pagó” en Control semanal.</div>':'')
+  +'<label>Monto recibido (CLP)</label><input id="p_amount" type="number" inputmode="numeric" min="0" step="1" placeholder="'+(bal?'hasta '+bal:'0')+'" value="'+esc(P.amount)+'">'
+  +'<label>Fecha del pago</label><input id="p_date" type="date" value="'+P.date+'">'
+  +'<label>Medio de pago</label><select id="p_method">'+Object.keys(PA.METHODS).map(function(k){return '<option value="'+k+'"'+(k===P.method?' selected':'')+'>'+PA.METHODS[k]+'</option>'}).join('')+'</select>'
+  +'<label>Aplicar a</label><select id="p_target"><option value="oldest">Deudas más antiguas primero</option>'+d.map(function(x){return '<option value="'+x.date+'"'+(P.target===x.date?' selected':'')+'>Semana del '+fdate(x.date)+' (debe '+clp(x.balance)+')</option>'}).join('')+'</select>'
+  +'<label>Observaciones (opcional)</label><textarea id="p_note" rows="2">'+esc(P.note)+'</textarea></div>'
+  +'<button class="btn" data-a="savePay">Guardar pago</button>'
+  +'<h3 style="margin:18px 2px 8px">Últimos pagos y abonos</h3>'+(recent.length?'<div class="list">'+recent.map(payRow).join('')+'</div>':'<div class="empty">Aún no hay abonos registrados.</div>');
+}
+
+function vDebts(){
+  var rows=S.members.map(function(m){return {m:m,b:PA.balanceOf(S,m.id)}}).filter(function(x){return x.b>0}).sort(function(a,b){return b.b-a.b});
+  var tot=rows.reduce(function(t,x){return t+x.b},0);
+  return header('Deudas pendientes',true)
+  +'<div class="card"><div class="sub">Total adeudado (aún no recibido)</div><b style="font-size:28px" class="tag-y">'+clp(tot)+'</b></div>'
+  +(rows.length?'<div class="list">'+rows.map(function(x){return '<button class="item" data-a="payFor" data-id="'+x.m.id+'">'+avatar(x.m)+'<div class="grow"><b>'+esc(full(x.m))+'</b><div class="sub">'+PA.debtsOf(S,x.m.id).filter(function(d){return d.balance>0}).length+' cuota(s) pendiente(s)</div></div><span class="pill p-debe">'+clp(x.b)+'</span><span class="chev">›</span></button>'}).join('')+'</div>':'<div class="empty">🎉 Nadie tiene deudas pendientes.</div>');
+}
+
+function vReports(){
+  var R=ui.rep, ym=R.ym, mem=R.member;
+  var months={}; months[today.slice(0,7)]=1; Object.keys(S.sessions).forEach(function(d){months[d.slice(0,7)]=1}); S.payments.forEach(function(p){months[p.date.slice(0,7)]=1}); months[ym]=1;
+  var ml=Object.keys(months).sort().reverse();
+  var dates=Object.keys(S.sessions).filter(function(d){return d.slice(0,7)===ym}).sort().reverse();
+  var pagaron=0,debe=0,aus=0;
+  dates.forEach(function(d){var s=S.sessions[d]; if(s.status==='suspendida')return; Object.keys(s.marks).forEach(function(id){ if(mem&&id!==mem)return; var k=s.marks[id]; if(k==='pago')pagaron++; else if(k==='debe')debe++; else if(k==='ausente')aus++;});});
+  var wk=PA.collectedByWeek(S,ym);
+  var max=Math.max.apply(null,wk.map(function(w){return w.total}).concat([1]));
+  var collected=mem?(function(){var t=0;dates.forEach(function(d){var s=S.sessions[d];if(s.status!=='suspendida'&&s.marks[mem]==='pago')t+=s.fee});S.payments.forEach(function(p){if(p.memberId===mem&&p.date.slice(0,7)===ym)t+=p.amount});return t})():PA.monthCollected(S,ym);
+  var pend=(mem?PA.balanceOf(S,mem):PA.totalDebt(S));
+  var pays=S.payments.filter(function(p){return p.date.slice(0,7)===ym&&(!mem||p.memberId===mem)}).sort(function(a,b){return a.date<b.date?1:-1});
+  var members=S.members.slice().sort(PA.byName);
+  var tbl=members.filter(function(m){return !mem||m.id===mem}).map(function(m){
+    return '<div class="item"><div class="grow"><b>'+esc(full(m))+'</b><div class="sub">Ausencias: '+PA.absences(S,m.id)+' · Abonos: '+clp(S.payments.filter(function(p){return p.memberId===m.id}).reduce(function(t,p){return t+p.amount},0))+'</div></div>'+(PA.balanceOf(S,m.id)?'<span class="pill p-debe">Debe '+clp(PA.balanceOf(S,m.id))+'</span>':'<span class="pill p-ok">Al día</span>')+'</div>';
+  }).join('');
+  var ymI=ml.indexOf(ym);
+  return header('Reportes',false)
+  +'<div class="row" style="margin-bottom:10px"><button class="ibtn" data-a="repMonth" data-v="1">‹</button><select id="r_ym" class="grow" style="text-align:center">'+ml.map(function(x){return '<option value="'+x+'"'+(x===ym?' selected':'')+'>'+fmonth(x)+'</option>'}).join('')+'</select><button class="ibtn" data-a="repMonth" data-v="-1">›</button></div>'
+  +'<select id="r_mem" style="margin-bottom:12px"><option value="">Todos los integrantes</option>'+members.map(function(m){return '<option value="'+m.id+'"'+(m.id===mem?' selected':'')+'>'+esc(full(m))+'</option>'}).join('')+'</select>'
+  +'<div class="grid2">'+tile('💰','i-g',clp(collected),'Recaudado (dinero recibido)')+tile('🧾','i-y',clp(pend),'Deuda pendiente total')+'</div>'
+  +'<div class="grid2">'+tile('✓','i-g',pagaron,'Pagos de cuota')+tile('⏳','i-y',debe,'Cuotas “Debe”')+tile('✕','i-r',aus,'Ausencias')+tile('☂','i-b',dates.filter(function(d){return S.sessions[d].status==='suspendida'}).length,'Sesiones suspendidas')+'</div>'
+  +(!mem?'<h3 style="margin:8px 2px">Recaudación por semana</h3><div class="card">'+(wk.length?'<div class="bars">'+wk.map(function(w){var d=PA.parseYmd(w.week);return '<div class="bar"><em>'+clp(w.total)+'</em><div style="height:'+Math.max(3,Math.round(w.total/max*90))+'px"></div>'+d.getDate()+'/'+(d.getMonth()+1)+'</div>'}).join('')+'</div><div class="sub" style="margin-top:6px">Semanas que comienzan el lunes indicado.</div>':'<div class="empty">Sin recaudación este mes.</div>')+'</div>':'')
+  +'<h3 style="margin:8px 2px">Sesiones de '+fmonth(ym)+'</h3>'
+  +(dates.length?'<div class="list">'+dates.map(function(d){var s=S.sessions[d],st=PA.sessionStats(S,d);
+     if(mem){var k=s.status==='suspendida'?'suspendida':s.marks[mem]; return '<button class="item" data-a="openSession" data-v="'+d+'"><span class="grow">'+fdate(d)+'</span>'+(k?'<span class="pill p-'+k+'">'+LABEL[k]+'</span>':'<span class="sub">sin marcar</span>')+'</button>';}
+     return '<button class="item" data-a="openSession" data-v="'+d+'"><div class="grow"><b>'+fdate(d)+'</b><div class="sub">'+(s.status==='suspendida'?'Suspendida':st.pagaron+' pagaron · '+st.deben+' deben · '+st.ausentes+' ausentes')+'</div></div>'+(s.status==='suspendida'?'<span class="pill p-suspendida">☂</span>':'<b>'+clp(st.recaudado)+'</b>')+'<span class="chev">›</span></button>'}).join('')+'</div>':'<div class="empty">No hay sesiones en este mes.</div>')
+  +'<h3 style="margin:8px 2px">Pagos y abonos del mes</h3>'+(pays.length?'<div class="list">'+pays.map(payRow).join('')+'</div>':'<div class="empty">Sin abonos este mes.</div>')
+  +'<h3 style="margin:8px 2px">Detalle por integrante</h3><div class="list">'+(tbl||'<div class="empty">Sin integrantes.</div>')+'</div>'
+  +'<div class="btns"><button class="btn" data-a="exportReport">⬇️ Exportar reporte (CSV / Excel)</button></div>';
+}
+
+function vSettings(){
+  var c=S.settings, m=meta();
+  return header('Configuración',true)
+  +'<div class="card"><h3>Datos generales</h3><label>Monto de la cuota semanal (CLP)</label><input id="s_fee" type="number" inputmode="numeric" min="0" value="'+c.fee+'">'
+  +'<div class="sub" style="margin-top:6px">El nuevo monto aplica a las sesiones que crees desde ahora. Las sesiones ya registradas conservan la cuota con que se cobraron.</div>'
+  +'<label>Lugar del taller</label><input id="s_place" value="'+esc(c.place)+'">'
+  +'<label>Día habitual</label><select id="s_wd">'+DOW.map(function(d,i){return '<option value="'+i+'"'+(i===c.weekday?' selected':'')+'>'+cap(d)+'</option>'}).join('')+'</select>'
+  +'<label>Hora habitual</label><input id="s_time" type="time" value="'+esc(c.time)+'">'
+  +'<div class="switch" style="margin-top:12px"><span>Confirmar antes de suspender una sesión</span><button class="sw '+(c.confirm?'on':'')+'" data-a="toggleConfirm"></button></div></div>'
+  +'<div class="card"><h3>Respaldo de datos</h3>'
+  +'<div class="warnbox" style="margin-top:10px"><b>Importante:</b> los datos se guardan en este iPhone (almacenamiento del navegador). Se conservan al cerrar la app y al actualizarla, pero <b>se pierden si borras los datos de Safari / “Borrar historial y datos”, si eliminas la app de la pantalla de inicio o si cambias de teléfono</b>. Descarga un respaldo cada semana y guárdalo en Archivos, iCloud o tu correo.</div>'
+  +'<div class="sub">Último respaldo: <b>'+(m.last?new Date(m.last).toLocaleDateString('es-CL'):'nunca')+'</b></div>'
+  +'<div class="btns"><button class="btn" data-a="backup">⬇️ Descargar respaldo completo (.json)</button><button class="btn sec" data-a="restore">⬆️ Restaurar desde respaldo (.json)</button><button class="btn sec" data-a="exportReport">⬇️ Exportar cuotas y pagos (CSV / Excel)</button><button class="btn sec" data-a="exportMembers">⬇️ Exportar nómina (CSV)</button><button class="btn sec" data-a="importMembers">⬆️ Importar nómina (CSV)</button></div></div>'
+  +'<div class="infobox">Los CSV usan “;” como separador y se abren directamente en Excel. Si pides acceso desde otro dispositivo, puedes restaurar el respaldo .json allí.</div>';
+}
+
+function render(){
+  var v;
+  if(ui.screen==='memberForm') v=vMemberForm();
+  else if(ui.screen==='member') v=vMember();
+  else if(ui.screen==='settings') v=vSettings();
+  else if(ui.screen==='debts') v=vDebts();
+  else v={home:vHome,members:vMembers,session:vSession,pay:vPay,reports:vReports}[ui.tab]();
+  var y=window.scrollY; $('#app').innerHTML=v;
+  var act=ui.screen?({member:'members',memberForm:'members'}[ui.screen]||ui.tab):ui.tab;
+  $('#tabs').innerHTML=[['home','🏠','Inicio'],['members','👥','Integrantes'],['session','🎭','Sesión'],['pay','💵','Pagos'],['reports','📊','Reportes']].map(function(t){return '<button data-a="tab" data-v="'+t[0]+'" class="'+(act===t[0]?'on':'')+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('');
+  window.scrollTo(0,y);
+}
+function go(tab){ui.tab=tab;ui.screen=null;window.scrollTo(0,0);render()}
+
+/* ---------- acciones ---------- */
+var A={
+  tab:function(e){go(e.v)},
+  back:function(){ if(ui.screen==='memberForm'&&ui.memberId&&ui.edit!=='new')ui.screen='member'; else ui.screen=null; render()},
+  goSession:function(){go('session')},
+  settings:function(){ui.screen='settings';render()},
+  debts:function(){ui.screen='debts';render()},
+  filter:function(e){ui.filter=e.v;render()},
+  addMember:function(){ui.edit='new';ui.screen='memberForm';render()},
+  editMember:function(e){ui.edit=e.id;ui.screen='memberForm';render()},
+  member:function(e){ui.memberId=e.id;ui.mtab='hist';ui.screen='member';window.scrollTo(0,0);render()},
+  mtab:function(e){ui.mtab=e.v;render()},
+  saveMember:function(){
+    var f=$('#f_first').value,l=$('#f_last').value,j=$('#f_join').value||today;
+    if(ui.edit==='new'){var r=PA.addMember(S,f,l,j); if(!r.ok)return toast(r.error); ui.memberId=r.member.id;}
+    else{ if(!f.trim())return toast('Falta el nombre.'); var m=PA.memberById(S,ui.edit); m.first=f.trim();m.last=l.trim();m.joinDate=j;}
+    save();toast('Integrante guardado');ui.screen='member';ui.edit=null;render();
+  },
+  toggleActive:function(e){var m=PA.memberById(S,e.id);m.active=!m.active;save();render()},
+  mark:function(e){var r=PA.setMark(S,ui.date,e.id,e.v); if(!r.ok)return toast(r.error); save();render()},
+  status:function(e){
+    var cur=S.sessions[ui.date]&&S.sessions[ui.date].status; if((cur||'realizada')===e.v)return;
+    if(e.v==='suspendida'&&S.settings.confirm&&!confirm('¿Suspender la sesión del '+fdate(ui.date)+'? Nadie pagará cuota esa semana (las deudas anteriores se mantienen).'))return;
+    var r=PA.setStatus(S,ui.date,e.v); if(!r.ok)return toast(r.error); save();render();
+  },
+  prevDate:function(){shiftDate(-7)}, nextDate:function(){shiftDate(7)},
+  openSession:function(e){ui.date=e.v;go('session')},
+  payFor:function(e){ui.pay.memberId=e.id;ui.pay.target='oldest';ui.pay.amount='';ui.pay.date=today;ui.pay.note='';go('pay')},
+  savePay:function(){
+    var P=ui.pay; P.amount=$('#p_amount').value;P.date=$('#p_date').value;P.note=$('#p_note').value;P.method=$('#p_method').value;P.target=$('#p_target').value;
+    var r=PA.addPayment(S,{memberId:P.memberId,date:P.date,amount:P.amount,method:P.method,note:P.note,target:P.target});
+    if(!r.ok)return toast(r.error); save(); ui.pay.amount='';ui.pay.note='';ui.pay.target='oldest'; toast('Pago registrado: '+clp(r.payment.amount)); render();
+  },
+  delPay:function(e){ if(!confirm('¿Anular este pago? La deuda asociada volverá a quedar pendiente.'))return; PA.deletePayment(S,e.id);save();render()},
+  repMonth:function(e){var months={};months[today.slice(0,7)]=1;Object.keys(S.sessions).forEach(function(d){months[d.slice(0,7)]=1});S.payments.forEach(function(p){months[p.date.slice(0,7)]=1});months[ui.rep.ym]=1;var ml=Object.keys(months).sort().reverse();var i=ml.indexOf(ui.rep.ym)+(+e.v);if(i>=0&&i<ml.length)ui.rep.ym=ml[i];render()},
+  toggleConfirm:function(){S.settings.confirm=!S.settings.confirm;save();render()},
+  backup:function(){download('respaldo-primer-acto-'+today+'.json',JSON.stringify(S,null,1),'application/json');markBackup();toast('Respaldo descargado. Guárdalo en Archivos o iCloud.');setTimeout(render,50)},
+  restore:function(){pickFile('.json,application/json',function(txt){try{var d=JSON.parse(txt);if(!d.members||!d.sessions||!d.payments)throw 0;if(!confirm('Esto reemplazará TODOS los datos actuales por los del respaldo ('+d.members.length+' integrantes). ¿Continuar?'))return;try{localStorage.setItem(KEY+'.prerestore',JSON.stringify(S))}catch(e){}S=migrate(d);save();ui.date=PA.nextSessionDate(S,new Date());toast('Respaldo restaurado');render()}catch(e){toast('Ese archivo no es un respaldo válido.')}})},
+  exportMembers:function(){download('nomina-primer-acto.csv',PA.exportMembersCsv(S));},
+  exportReport:function(){download('reporte-cuotas-primer-acto-'+today+'.csv',PA.exportReportCsv(S));},
+  importMembers:function(){pickFile('.csv,text/csv,text/plain',function(txt){var r=PA.importMembersCsv(S,txt,today);save();toast(r.added+' integrantes agregados'+(r.skipped?' · '+r.skipped+' ya existían':''));render()})}
+};
+function shiftDate(n){var d=PA.parseYmd(ui.date);d.setDate(d.getDate()+n);ui.date=PA.ymd(d);render()}
+
+document.addEventListener('click',function(ev){
+  var el=ev.target.closest('[data-a]'); if(!el)return;
+  var f=A[el.dataset.a]; if(f){ev.preventDefault();f({id:el.dataset.id,v:el.dataset.v})}
+});
+document.addEventListener('input',function(ev){
+  if(ev.target.id==='q'){ui.q=ev.target.value;var pos=ev.target.selectionStart;render();var q=$('#q');q.focus();q.setSelectionRange(pos,pos);}
+});
+document.addEventListener('change',function(ev){
+  var id=ev.target.id, v=ev.target.value;
+  if(id==='sdate'&&v){ui.date=v;render()}
+  else if(id==='p_member'){ui.pay.memberId=v;ui.pay.target='oldest';render()}
+  else if(id==='p_target'||id==='p_method'||id==='p_date'||id==='p_note'||id==='p_amount'){ui.pay[{p_target:'target',p_method:'method',p_date:'date',p_note:'note',p_amount:'amount'}[id]]=v; if(id==='p_target')render()}
+  else if(id==='r_ym'){ui.rep.ym=v;render()}
+  else if(id==='r_mem'){ui.rep.member=v;render()}
+  else if(id==='s_fee'){var n=Math.round(Number(v));if(n>=0){S.settings.fee=n;save();toast('Cuota: '+clp(n))}}
+  else if(id==='s_place'){S.settings.place=v;save()}
+  else if(id==='s_time'){S.settings.time=v;save()}
+  else if(id==='s_wd'){S.settings.weekday=+v;save();ui.date=PA.nextSessionDate(S,new Date())}
+});
+
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
+render();
+})();
+</script>
+</body>
+</html>
