@@ -1,345 +1,266 @@
-/* Primer Acto | Cuotas y Asistencia — lógica pura (sin DOM) */
-(function (root) {
+/* Primer Acto | Cuotas y Asistencia — lógica pura (sin DOM), testeable en Node */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.PA = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+  /* ---------- fechas (ISO local YYYY-MM-DD) ---------- */
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function toISO(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parse(iso) { var p = iso.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function todayISO() { return toISO(new Date()); }
+  function addDays(iso, n) { var d = parse(iso); d.setDate(d.getDate() + n); return toISO(d); }
+  function weekday(iso) { return parse(iso).getDay(); }
+  function fmtLong(iso) { var d = parse(iso); return DIAS[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES[d.getMonth()]; }
+  function fmtFull(iso) { var d = parse(iso); return d.getDate() + ' de ' + MESES[d.getMonth()] + ' de ' + d.getFullYear(); }
+  function fmtShort(iso) { var d = parse(iso); return pad(d.getDate()) + ' ' + MESES[d.getMonth()].slice(0, 3) + ' ' + d.getFullYear(); }
+  function monthLabel(ym) { var p = ym.split('-'); var m = MESES[+p[1] - 1]; return m.charAt(0).toUpperCase() + m.slice(1) + ' ' + p[0]; }
+  function addMonths(ym, n) { var p = ym.split('-'); var d = new Date(+p[0], +p[1] - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+  function mondayOf(iso) { var w = weekday(iso); return addDays(iso, -((w + 6) % 7)); }
+  function nextSessionDate(from, wd) { var d = from; for (var i = 0; i < 7; i++) { if (weekday(d) === wd) return d; d = addDays(d, 1); } return from; }
+
+  /* ---------- formato ---------- */
+  function clp(n) {
+    n = Math.round(+n || 0);
+    var neg = n < 0; n = Math.abs(n);
+    var s = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (neg ? '-' : '') + '$' + s;
+  }
+  function uid() { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function initials(m) { return ((m.first || '').charAt(0) + (m.last || '').charAt(0)).toUpperCase() || '?'; }
+  function fullName(m) { return (m.first + ' ' + (m.last || '')).trim(); }
+
+  /* ---------- estado ---------- */
   function newState() {
     return {
       v: 1,
-      settings: { fee: 500, place: '', time: '18:30', weekday: 5, confirm: true, showInactive: false },
-      members: [],
-      sessions: {},   // { 'YYYY-MM-DD': { status:'realizada'|'suspendida', fee:500, marks:{ memberId:'pago'|'debe'|'ausente' } } }
-      payments: [],   // { id, memberId, date, amount, method, note, allocs:[{date, amount}] }
-      cash: []        // fondo: { id, type:'inicial'|'ingreso'|'gasto', date, amount, note }
+      settings: { fee: 500, place: 'Parroquia Niño Dios de Malloco', weekday: 5, time: '18:30', confirmSave: true, showInactive: false, rememberView: true },
+      members: [],   // {id, first, last, active, startDate, inactiveSince}
+      sessions: {},  // 'YYYY-MM-DD' -> {status:'done'|'suspended', fee, marks:{memberId:'paid'|'owes'|'absent'}}
+      payments: []   // {id, memberId, date, amount, method, applyTo, note, createdAt}
     };
   }
 
-  var uid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); };
-
-  function pad(n) { return (n < 10 ? '0' : '') + n; }
-  function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function parseYmd(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
-
-  function nextSessionDate(state, today) {
-    var d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    var wd = state.settings.weekday;
-    while (d.getDay() !== wd) d.setDate(d.getDate() + 1);
-    return ymd(d);
-  }
-
-  function ensureSession(state, date) {
-    if (!state.sessions[date]) state.sessions[date] = { status: 'realizada', fee: state.settings.fee, marks: {} };
-    return state.sessions[date];
-  }
-
-  function memberById(state, id) { return state.members.filter(function (m) { return m.id === id; })[0]; }
-
-  function addMember(state, first, last, joinDate) {
+  function addMember(S, first, last, startDate) {
     first = (first || '').trim(); last = (last || '').trim();
-    if (!first) return { ok: false, error: 'Falta el nombre.' };
-    var m = { id: uid(), first: first, last: last, active: true, joinDate: joinDate };
-    state.members.push(m);
-    return { ok: true, member: m };
+    if (!first) return { error: 'Escribe el nombre.' };
+    var m = { id: uid(), first: first, last: last, active: true, startDate: startDate || todayISO(), inactiveSince: null };
+    S.members.push(m);
+    return { member: m };
+  }
+  function setActive(S, id, active, today) {
+    var m = S.members.filter(function (x) { return x.id === id; })[0];
+    if (!m) return;
+    m.active = !!active;
+    m.inactiveSince = active ? null : (today || todayISO());
   }
 
-  /* Integrantes que aparecen en una sesión: activos que ya se habían incorporado,
-     más cualquiera (aunque esté inactivo) que ya tenga una marca guardada. */
-  function roster(state, date) {
-    var s = state.sessions[date];
-    return state.members.filter(function (m) {
-      if (s && s.marks[m.id]) return true;
-      return m.active && m.joinDate <= date;
-    }).sort(byName);
+  function inRoster(S, m, date) {
+    var ses = S.sessions[date];
+    if (m.startDate && date < m.startDate) return false;           // no deudas anteriores a la incorporación
+    if (ses && ses.marks && ses.marks[m.id]) return true;           // ya tiene registro en esa sesión
+    if (m.active) return true;
+    return !!(m.inactiveSince && date < m.inactiveSince);           // inactivo: sólo sesiones anteriores
   }
-  function byName(a, b) { return (a.first + ' ' + a.last).localeCompare(b.first + ' ' + b.last, 'es'); }
-
-  function allocatedTo(state, memberId, date) {
-    var t = 0;
-    state.payments.forEach(function (p) {
-      if (p.memberId !== memberId) return;
-      p.allocs.forEach(function (a) { if (a.date === date) t += a.amount; });
-    });
-    return t;
+  function roster(S, date) {
+    return S.members.filter(function (m) { return inRoster(S, m, date); })
+      .sort(function (a, b) { return fullName(a).localeCompare(fullName(b), 'es'); });
   }
 
-  /* Cuota que genera (member, sesión): 0 si suspendida, ausente o sin marcar. */
-  function charge(session, memberId) {
-    if (!session || session.status === 'suspendida') return 0;
-    var mk = session.marks[memberId];
-    return (mk === 'pago' || mk === 'debe') ? session.fee : 0;
+  function ensureSession(S, date) {
+    if (!S.sessions[date]) S.sessions[date] = { status: 'done', fee: S.settings.fee, marks: {} };
+    return S.sessions[date];
+  }
+  /* Marca idempotente: el estado se guarda por (sesión, persona); editar nunca suma cobros. */
+  function setMark(S, date, id, mark) {
+    var m = S.members.filter(function (x) { return x.id === id; })[0];
+    if (!m || !inRoster(S, m, date)) return { error: 'La persona no pertenece a esa sesión.' };
+    var ses = ensureSession(S, date);
+    if (ses.status === 'suspended') return { error: 'La sesión está suspendida.' };
+    if (ses.marks[id] === mark || !mark) delete ses.marks[id]; else ses.marks[id] = mark;
+    return { ok: true };
+  }
+  function setStatus(S, date, status) {
+    var ses = ensureSession(S, date);
+    ses.status = status;           // las marcas se conservan, pero no cuentan mientras esté suspendida
   }
 
-  /* Deudas de una persona: una por cada sesión realizada marcada "debe". */
-  function debtsOf(state, memberId) {
-    var out = [];
-    Object.keys(state.sessions).sort().forEach(function (date) {
-      var s = state.sessions[date];
-      if (s.status === 'suspendida' || s.marks[memberId] !== 'debe') return;
-      var paid = Math.min(allocatedTo(state, memberId, date), s.fee);
-      out.push({ date: date, fee: s.fee, paid: paid, balance: s.fee - paid });
+  /* ---------- libro de deudas y abonos (todo derivado => sin duplicados) ---------- */
+  function ledger(S) {
+    var out = {};
+    var dates = Object.keys(S.sessions).sort();
+    S.members.forEach(function (m) {
+      var debts = [];
+      dates.forEach(function (d) {
+        var s = S.sessions[d];
+        if (s.status === 'done' && s.marks[m.id] === 'owes') debts.push({ date: d, amount: s.fee, paid: 0, balance: s.fee });
+      });
+      var pays = S.payments.filter(function (p) { return p.memberId === m.id; }).sort(function (a, b) {
+        return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt || 0) - (b.createdAt || 0);
+      });
+      var credit = 0, allocs = {};
+      pays.forEach(function (p) {
+        var rem = p.amount, al = [];
+        function apply(d) { var a = Math.min(rem, d.balance); if (a > 0) { d.paid += a; d.balance -= a; rem -= a; al.push({ date: d.date, amount: a }); } }
+        if (p.applyTo && p.applyTo !== 'oldest') { var t = debts.filter(function (d) { return d.date === p.applyTo; })[0]; if (t) apply(t); }
+        debts.forEach(function (d) { if (rem > 0) apply(d); });
+        credit += rem; allocs[p.id] = al;
+      });
+      var bal = debts.reduce(function (a, d) { return a + d.balance; }, 0);
+      out[m.id] = { debts: debts, balance: bal, credit: credit, allocs: allocs };
     });
     return out;
   }
-  function balanceOf(state, memberId) {
-    return debtsOf(state, memberId).reduce(function (t, d) { return t + d.balance; }, 0);
-  }
-  function totalDebt(state) {
-    return state.members.reduce(function (t, m) { return t + balanceOf(state, m.id); }, 0);
-  }
+  function totalPending(S, L) { L = L || ledger(S); return S.members.reduce(function (a, m) { return a + (L[m.id] ? L[m.id].balance : 0); }, 0); }
 
-  function hasAllocs(state, memberId, date) { return allocatedTo(state, memberId, date) > 0; }
-
-  function setMark(state, date, memberId, mark) {
-    var s = ensureSession(state, date);
-    if (s.status === 'suspendida') return { ok: false, error: 'La sesión está suspendida.' };
-    var prev = s.marks[memberId];
-    if (prev === 'debe' && mark !== 'debe' && hasAllocs(state, memberId, date))
-      return { ok: false, error: 'Esa deuda ya tiene abonos registrados. Elimina primero el abono desde Pagos.' };
-    if (mark === prev) delete s.marks[memberId]; // un segundo toque desmarca
-    else s.marks[memberId] = mark;
-    return { ok: true };
-  }
-
-  function setStatus(state, date, status) {
-    var s = ensureSession(state, date);
-    if (status === 'suspendida') {
-      var blocked = Object.keys(s.marks).some(function (id) { return hasAllocs(state, id, date); });
-      if (blocked) return { ok: false, error: 'Hay abonos asociados a esta sesión. Elimínalos antes de suspenderla.' };
+  /* Un pago puede ser mayor que la deuda: primero salda deudas (las más antiguas, o la semana elegida)
+     y el resto queda como SALDO A FAVOR, que cubre automáticamente las próximas sesiones marcadas como "Debe / Usa saldo". */
+  var MAX_PAGO = 1000000;
+  function addPayment(S, p) {
+    var L = ledger(S), l = L[p.memberId];
+    var amount = Math.round(+p.amount);
+    if (!l) return { error: 'Elige un integrante.' };
+    if (!(amount > 0)) return { error: 'Ingresa un monto mayor a cero.' };
+    if (amount > MAX_PAGO) return { error: 'El monto es demasiado alto. Revísalo.' };
+    if (p.applyTo && p.applyTo !== 'oldest') {
+      var d = l.debts.filter(function (x) { return x.date === p.applyTo; })[0];
+      if (!d) return { error: 'Esa semana no existe como deuda.' };
     }
-    s.status = status;
-    return { ok: true };
+    var pay = { id: uid(), memberId: p.memberId, date: p.date || todayISO(), amount: amount, method: p.method || 'Efectivo', applyTo: p.applyTo || 'oldest', note: (p.note || '').trim(), createdAt: Date.now() };
+    S.payments.push(pay);
+    return { payment: pay };
   }
+  /* Vista previa (no guarda nada): cómo quedaría la cuenta de la persona si se registra este pago. */
+  function previewPayment(S, p) {
+    var amount = Math.round(+p.amount) || 0;
+    var before = ledger(S)[p.memberId];
+    if (!before) return null;
+    var fake = { settings: S.settings, members: S.members, sessions: S.sessions,
+      payments: S.payments.concat([{ id: '_prev', memberId: p.memberId, date: p.date || todayISO(), amount: amount, applyTo: p.applyTo || 'oldest', createdAt: Date.now() + 1e9 }]) };
+    var after = ledger(fake)[p.memberId];
+    var settled = 0, weeksBefore = 0;
+    before.debts.forEach(function (d, i) { if (d.balance > 0) { weeksBefore++; if (after.debts[i].balance === 0) settled++; } });
+    return { amount: amount, before: { balance: before.balance, credit: before.credit }, after: { balance: after.balance, credit: after.credit }, settled: settled, weeksOpen: weeksBefore,
+      toDebt: before.balance - after.balance, toCredit: after.credit - before.credit };
+  }
+  function totalCredit(S, L) { L = L || ledger(S); return S.members.reduce(function (a, m) { return a + (L[m.id] ? L[m.id].credit : 0); }, 0); }
+  function removePayment(S, id) { S.payments = S.payments.filter(function (p) { return p.id !== id; }); }
 
-  /* Registrar pago/abono. target: 'oldest' (más antiguas primero) o una fecha concreta. */
-  function addPayment(state, o) {
-    var amount = Math.round(Number(o.amount));
-    if (!o.memberId || !memberById(state, o.memberId)) return { ok: false, error: 'Elige un integrante.' };
-    if (!(amount > 0)) return { ok: false, error: 'El monto debe ser mayor a $0.' };
-    if (!o.date) return { ok: false, error: 'Falta la fecha del pago.' };
-    var debts = debtsOf(state, o.memberId).filter(function (d) { return d.balance > 0; });
-    if (o.target && o.target !== 'oldest') debts = debts.filter(function (d) { return d.date === o.target; });
-    var total = debts.reduce(function (t, d) { return t + d.balance; }, 0);
-    if (total === 0) return { ok: false, error: 'No hay deuda pendiente para aplicar este pago.' };
-    if (amount > total) return { ok: false, error: 'El monto supera la deuda pendiente (' + total + ').' };
-    var left = amount, allocs = [];
-    for (var i = 0; i < debts.length && left > 0; i++) {
-      var a = Math.min(left, debts[i].balance);
-      allocs.push({ date: debts[i].date, amount: a });
-      left -= a;
-    }
-    var p = { id: uid(), memberId: o.memberId, date: o.date, amount: amount,
-      method: o.method || 'efectivo', note: o.note || '', allocs: allocs };
-    state.payments.push(p);
-    return { ok: true, payment: p };
-  }
-
-  function deletePayment(state, id) {
-    state.payments = state.payments.filter(function (p) { return p.id !== id; });
-  }
-
-  /* Estadísticas de una sesión. Dinero recaudado y deuda se mantienen separados. */
-  function sessionStats(state, date) {
-    var s = state.sessions[date];
-    var list = roster(state, date);
-    var st = { activos: list.length, pagaron: 0, deben: 0, ausentes: 0, sinMarcar: 0, suspendida: false,
-      cuotasCobradas: 0, abonos: 0, recaudado: 0, pendienteSesion: 0 };
-    if (s && s.status === 'suspendida') st.suspendida = true;
-    list.forEach(function (m) {
-      var mk = s && s.marks[m.id];
-      if (st.suspendida) return;
-      if (mk === 'pago') st.pagaron++;
-      else if (mk === 'debe') { st.deben++; st.pendienteSesion += Math.max(0, s.fee - allocatedTo(state, m.id, date)); }
-      else if (mk === 'ausente') st.ausentes++;
-      else st.sinMarcar++;
-    });
-    st.cuotasCobradas = st.suspendida ? 0 : st.pagaron * (s ? s.fee : state.settings.fee);
-    state.payments.forEach(function (p) { if (p.date === date) st.abonos += p.amount; });
-    st.recaudado = st.cuotasCobradas + st.abonos;
-    return st;
-  }
-
-  function monthCollected(state, ym) {
-    var t = 0;
-    Object.keys(state.sessions).forEach(function (d) {
-      var s = state.sessions[d];
-      if (d.slice(0, 7) !== ym || s.status === 'suspendida') return;
-      Object.keys(s.marks).forEach(function (id) { if (s.marks[id] === 'pago') t += s.fee; });
-    });
-    state.payments.forEach(function (p) { if (p.date.slice(0, 7) === ym) t += p.amount; });
-    return t;
-  }
-
-  /* Fondo del taller = saldo inicial + cuotas y abonos recibidos desde la fecha del saldo inicial
-     + otros ingresos − gastos. Las deudas pendientes NO cuentan (no es dinero recibido). */
-  function fundSummary(state) {
-    var cash = state.cash || [];
-    var open = cash.filter(function (c) { return c.type === 'inicial'; })[0];
-    var since = open ? open.date : '0000-00-00';
-    var cuotas = 0, otros = 0, gastos = 0;
-    Object.keys(state.sessions).forEach(function (d) {
-      var s = state.sessions[d];
-      if (d < since || s.status === 'suspendida') return;
-      Object.keys(s.marks).forEach(function (id) { if (s.marks[id] === 'pago') cuotas += s.fee; });
-    });
-    state.payments.forEach(function (p) { if (p.date >= since) cuotas += p.amount; });
-    cash.forEach(function (c) {
-      if (c.type === 'inicial' || c.date < since) return;
-      if (c.type === 'ingreso') otros += c.amount; else if (c.type === 'gasto') gastos += c.amount;
-    });
-    var inicial = open ? open.amount : 0;
-    return { inicial: inicial, since: open ? open.date : null, cuotas: cuotas, otros: otros, gastos: gastos, total: inicial + cuotas + otros - gastos };
-  }
-  function addCash(state, o) {
-    var amount = Math.round(Number(o.amount));
-    if (['inicial', 'ingreso', 'gasto'].indexOf(o.type) < 0) return { ok: false, error: 'Elige el tipo de movimiento.' };
-    if (!(amount > 0)) return { ok: false, error: 'El monto debe ser mayor a $0.' };
-    if (!o.date) return { ok: false, error: 'Falta la fecha.' };
-    if (!state.cash) state.cash = [];
-    if (o.type === 'inicial') state.cash = state.cash.filter(function (c) { return c.type !== 'inicial'; });
-    var c = { id: uid(), type: o.type, date: o.date, amount: amount, note: o.note || '' };
-    state.cash.push(c);
-    return { ok: true, cash: c };
-  }
-  function deleteCash(state, id) { state.cash = (state.cash || []).filter(function (c) { return c.id !== id; }); }
-
-  /* Vista pública (solo lectura): nombre, estado por sesión y totales.
-     NO incluye el fondo, las notas, los medios de pago ni el detalle de abonos. */
-  function buildSnapshot(state) {
-    var dates = Object.keys(state.sessions).sort().slice(-8);
-    var lastYm = dates.length ? dates[dates.length - 1].slice(0, 7) : '';
-    var members = state.members.slice().sort(byName).map(function (m) {
-      var bal = balanceOf(state, m.id);
-      return { m: m, bal: bal };
-    }).filter(function (x) { return x.m.active || x.bal > 0; }).map(function (x) {
-      var marks = {};
-      dates.forEach(function (d) {
-        var s = state.sessions[d];
-        marks[d] = s.status === 'suspendida' ? 's' : ({ pago: 'p', debe: 'd', ausente: 'a' }[s.marks[x.m.id]] || '');
+  /* ---------- movimientos (base de reportes y exportación) ---------- */
+  function movements(S) {
+    var mv = [], byId = {};
+    S.members.forEach(function (m) { byId[m.id] = m; });
+    Object.keys(S.sessions).forEach(function (d) {
+      var s = S.sessions[d];
+      if (s.status === 'suspended') { mv.push({ date: d, type: 'suspendida', memberId: null, amount: 0 }); return; }
+      Object.keys(s.marks).forEach(function (id) {
+        if (!byId[id]) return;
+        var k = s.marks[id];
+        mv.push({ date: d, type: k === 'paid' ? 'pago_sesion' : k === 'owes' ? 'deuda' : 'ausente', memberId: id, amount: k === 'absent' ? 0 : s.fee, method: k === 'paid' ? 'Sesión' : '' });
       });
-      return { n: (x.m.first + ' ' + x.m.last).trim(), debt: x.bal, active: x.m.active, marks: marks };
     });
-    return {
-      updated: new Date().toISOString(),
-      fee: state.settings.fee,
-      place: state.settings.place || '',
-      time: state.settings.time || '',
-      sessions: dates.map(function (d) {
-        var st = sessionStats(state, d);
-        return { date: d, status: state.sessions[d].status, pagaron: st.pagaron, deben: st.deben, ausentes: st.ausentes, recaudado: st.recaudado };
-      }),
-      members: members,
-      totals: { deudaTotal: totalDebt(state), recaudadoMes: lastYm ? monthCollected(state, lastYm) : 0, mes: lastYm }
-    };
+    S.payments.forEach(function (p) { if (byId[p.memberId]) mv.push({ date: p.date, type: 'abono', memberId: p.memberId, amount: p.amount, method: p.method, note: p.note, applyTo: p.applyTo, id: p.id }); });
+    return mv.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
   }
+  function isCash(x) { return x.type === 'pago_sesion' || x.type === 'abono'; }
+  function sum(arr) { return arr.reduce(function (a, x) { return a + x.amount; }, 0); }
 
-  function weekStart(date) { // lunes de la semana
-    var d = parseYmd(date), dow = (d.getDay() + 6) % 7;
-    d.setDate(d.getDate() - dow); return ymd(d);
-  }
-  function collectedByWeek(state, ym) {
-    var map = {};
-    function add(date, v) { var w = weekStart(date); map[w] = (map[w] || 0) + v; }
-    Object.keys(state.sessions).forEach(function (d) {
-      var s = state.sessions[d];
-      if (s.status === 'suspendida' || (ym && d.slice(0, 7) !== ym)) return;
-      Object.keys(s.marks).forEach(function (id) { if (s.marks[id] === 'pago') add(d, s.fee); });
+  function sessionSummary(S, date, L) {
+    var ses = S.sessions[date], r = roster(S, date);
+    L = L || ledger(S);
+    var res = { date: date, status: ses ? ses.status : 'pending', active: r.length, paid: 0, owes: 0, covered: 0, absent: 0, unmarked: 0, collected: 0, pendingSession: 0, abonos: 0 };
+    if (ses && ses.status === 'suspended') return res;
+    r.forEach(function (m) {
+      var k = ses && ses.marks[m.id];
+      if (k === 'paid') res.paid++;
+      else if (k === 'owes') {
+        var d = L[m.id] && L[m.id].debts.filter(function (x) { return x.date === date; })[0];
+        if (d && d.balance === 0) res.covered++; else { res.owes++; res.pendingSession += d ? d.balance : 0; }
+      }
+      else if (k === 'absent') res.absent++; else res.unmarked++;
     });
-    state.payments.forEach(function (p) { if (!ym || p.date.slice(0, 7) === ym) add(p.date, p.amount); });
-    return Object.keys(map).sort().map(function (w) { return { week: w, total: map[w] }; });
+    var fee = ses ? ses.fee : S.settings.fee;
+    res.abonos = sum(S.payments.filter(function (p) { return p.date === date; }));
+    res.collected = res.paid * fee + res.abonos;
+    return res;
   }
+  function collectedInMonth(S, ym) { return sum(movements(S).filter(function (x) { return isCash(x) && x.date.slice(0, 7) === ym; })); }
+  function collectedOnDate(S, date) { return sum(movements(S).filter(function (x) { return isCash(x) && x.date === date; })); }
 
-  function memberHistory(state, memberId) {
-    var rows = [];
-    Object.keys(state.sessions).sort().reverse().forEach(function (date) {
-      var s = state.sessions[date];
-      var mk = s.marks[memberId];
-      if (s.status === 'suspendida') { rows.push({ date: date, kind: 'suspendida', amount: 0 }); return; }
-      if (!mk) return;
-      rows.push({ date: date, kind: mk, amount: mk === 'ausente' ? 0 : s.fee });
-    });
-    return rows;
-  }
-  function absences(state, memberId) {
-    return Object.keys(state.sessions).filter(function (d) {
-      var s = state.sessions[d]; return s.status !== 'suspendida' && s.marks[memberId] === 'ausente';
-    }).length;
-  }
-
-  /* CSV (separador ; y BOM, compatible con Excel en configuración regional chilena) */
-  function csvCell(v) { v = String(v == null ? '' : v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
-  function toCsv(rows) { return '\ufeff' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'); }
-  function parseCsv(text) {
+  /* ---------- CSV ---------- */
+  function csvCell(v) { v = (v == null ? '' : String(v)); return /[";\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function toCSV(rows) { return '\ufeff' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n'); }
+  function parseCSV(text) {
     text = text.replace(/^\ufeff/, '');
     var first = text.split(/\r?\n/)[0] || '';
-    var sep = (first.split(';').length >= first.split(',').length) ? ';' : ',';
-    var rows = [], row = [], cur = '', q = false;
+    var delim = (first.split(';').length > 1) ? ';' : (first.split('\t').length > 1 ? '\t' : ',');
+    var rows = [], row = [], cell = '', q = false;
     for (var i = 0; i < text.length; i++) {
       var c = text[i];
-      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
       else if (c === '"') q = true;
-      else if (c === sep) { row.push(cur); cur = ''; }
-      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
-      else cur += c;
+      else if (c === delim) { row.push(cell); cell = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += c;
     }
-    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
     return rows.filter(function (r) { return r.some(function (x) { return x.trim() !== ''; }); });
   }
-
-  function exportMembersCsv(state) {
-    var rows = [['Nombre', 'Apellido', 'Activo', 'Fecha de incorporación']];
-    state.members.slice().sort(byName).forEach(function (m) { rows.push([m.first, m.last, m.active ? 'Sí' : 'No', m.joinDate]); });
-    return toCsv(rows);
-  }
-  function importMembersCsv(state, text, today) {
-    var rows = parseCsv(text), added = 0, skipped = 0;
-    if (rows.length && /nombre/i.test(rows[0][0])) rows.shift();
+  /* Importa nómina: columnas "Nombre;Apellido" o una sola columna con nombre completo. No duplica personas. */
+  function importMembers(S, text, today) {
+    var rows = parseCSV(text), added = 0, skipped = 0;
+    if (rows.length && /^(nombre|name|integrante|participante)/i.test(rows[0][0].trim())) rows.shift();
+    var seen = {};
+    S.members.forEach(function (m) { seen[fullName(m).toLowerCase()] = true; });
     rows.forEach(function (r) {
       var first = (r[0] || '').trim(), last = (r[1] || '').trim();
+      if (!last && first.indexOf(' ') > 0) { var i = first.indexOf(' '); last = first.slice(i + 1).trim(); first = first.slice(0, i); }
       if (!first) return;
-      var dup = state.members.some(function (m) { return m.first.toLowerCase() === first.toLowerCase() && m.last.toLowerCase() === last.toLowerCase(); });
-      if (dup) { skipped++; return; }
-      var active = !/^(no|0|inactivo|false)$/i.test((r[2] || '').trim());
-      var join = /^\d{4}-\d{2}-\d{2}$/.test((r[3] || '').trim()) ? r[3].trim() : today;
-      var res = addMember(state, first, last, join); res.member.active = active; added++;
+      var key = (first + ' ' + last).trim().toLowerCase();
+      if (seen[key]) { skipped++; return; }
+      var estado = (r[2] || '').trim().toLowerCase();
+      var res = addMember(S, first, last, today);
+      if (res.member && (estado === 'inactivo' || estado === 'inactiva')) setActive(S, res.member.id, false, today);
+      seen[key] = true; added++;
     });
     return { added: added, skipped: skipped };
   }
 
-  var METHODS = { efectivo: 'Efectivo', transferencia: 'Transferencia', otro: 'Otro' };
-  function exportReportCsv(state) {
-    var rows = [['Tipo', 'Fecha', 'Integrante', 'Estado / Medio', 'Monto', 'Detalle']];
-    var name = function (id) { var m = memberById(state, id); return m ? (m.first + ' ' + m.last).trim() : '(eliminado)'; };
-    Object.keys(state.sessions).sort().forEach(function (d) {
-      var s = state.sessions[d];
-      if (s.status === 'suspendida') { rows.push(['Sesión', d, 'Todos', 'Suspendida', 0, '']); return; }
-      Object.keys(s.marks).forEach(function (id) {
-        var mk = s.marks[id];
-        rows.push(['Sesión', d, name(id), { pago: 'Pagó', debe: 'Debe', ausente: 'Ausente' }[mk], mk === 'ausente' ? 0 : s.fee,
-          mk === 'debe' ? 'Saldo pendiente: ' + Math.max(0, s.fee - allocatedTo(state, id, d)) : '']);
-      });
+  var TIPO = { pago_sesion: 'Pagó en sesión', deuda: 'Debe (deuda generada)', ausente: 'Ausente', suspendida: 'Sesión suspendida', abono: 'Pago / abono recibido' };
+  function reportRows(S, filter) {
+    filter = filter || {};
+    var byId = {}; S.members.forEach(function (m) { byId[m.id] = m; });
+    var rows = [['Fecha', 'Tipo', 'Participante', 'Monto CLP', 'Medio de pago', 'Se aplica a', 'Observaciones']];
+    movements(S).slice().reverse().forEach(function (x) {
+      if (filter.from && x.date < filter.from) return;
+      if (filter.to && x.date > filter.to) return;
+      if (filter.who && x.memberId !== filter.who) return;
+      rows.push([x.date, TIPO[x.type], x.memberId ? fullName(byId[x.memberId]) : 'Todos', x.amount, x.method || '', x.applyTo ? (x.applyTo === 'oldest' ? 'Deudas más antiguas' : 'Semana ' + x.applyTo) : '', x.note || '']);
     });
-    state.payments.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (p) {
-      rows.push(['Abono', p.date, name(p.memberId), METHODS[p.method] || p.method, p.amount,
-        (p.allocs.map(function (a) { return a.date + ': ' + a.amount; }).join(' | ')) + (p.note ? ' — ' + p.note : '')]);
-    });
-    var TIPO = { inicial: 'Fondo: saldo inicial', ingreso: 'Fondo: otro ingreso', gasto: 'Fondo: gasto' };
-    (state.cash || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (c) {
-      rows.push([TIPO[c.type], c.date, '', '', c.type === 'gasto' ? -c.amount : c.amount, c.note || '']);
-    });
-    rows.push([]);
-    rows.push(['Deuda pendiente total', '', '', '', totalDebt(state), '']);
-    rows.push(['Fondo del taller actual', '', '', '', fundSummary(state).total, '']);
-    return toCsv(rows);
+    return rows;
   }
 
-  function clp(n) { return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  /* ---------- carga / migración segura ---------- */
+  function normalize(raw) {
+    var base = newState();
+    if (!raw || typeof raw !== 'object') return base;
+    base.settings = Object.assign(base.settings, raw.settings || {});
+    base.members = Array.isArray(raw.members) ? raw.members : [];
+    base.sessions = raw.sessions && typeof raw.sessions === 'object' ? raw.sessions : {};
+    base.payments = Array.isArray(raw.payments) ? raw.payments : [];
+    return base;
+  }
 
-  var api = { newState: newState, uid: uid, ymd: ymd, parseYmd: parseYmd, nextSessionDate: nextSessionDate, ensureSession: ensureSession,
-    memberById: memberById, addMember: addMember, roster: roster, byName: byName, allocatedTo: allocatedTo, charge: charge,
-    debtsOf: debtsOf, balanceOf: balanceOf, totalDebt: totalDebt, setMark: setMark, setStatus: setStatus, addPayment: addPayment,
-    deletePayment: deletePayment, sessionStats: sessionStats, monthCollected: monthCollected, collectedByWeek: collectedByWeek,
-    memberHistory: memberHistory, absences: absences, toCsv: toCsv, parseCsv: parseCsv, exportMembersCsv: exportMembersCsv,
-    importMembersCsv: importMembersCsv, exportReportCsv: exportReportCsv, clp: clp, METHODS: METHODS,
-    fundSummary: fundSummary, addCash: addCash, deleteCash: deleteCash, buildSnapshot: buildSnapshot };
-
-  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PA = api;
-})(typeof window !== 'undefined' ? window : globalThis);
+  return {
+    MESES: MESES, DIAS: DIAS, pad: pad, toISO: toISO, parse: parse, todayISO: todayISO, addDays: addDays, weekday: weekday, fmtLong: fmtLong, fmtFull: fmtFull, fmtShort: fmtShort,
+    monthLabel: monthLabel, addMonths: addMonths, mondayOf: mondayOf, nextSessionDate: nextSessionDate, clp: clp, uid: uid, initials: initials, fullName: fullName,
+    newState: newState, addMember: addMember, setActive: setActive, inRoster: inRoster, roster: roster, ensureSession: ensureSession, setMark: setMark, setStatus: setStatus,
+    ledger: ledger, totalPending: totalPending, totalCredit: totalCredit, previewPayment: previewPayment, addPayment: addPayment, removePayment: removePayment, movements: movements, isCash: isCash, sum: sum,
+    sessionSummary: sessionSummary, collectedInMonth: collectedInMonth, collectedOnDate: collectedOnDate, toCSV: toCSV, parseCSV: parseCSV, importMembers: importMembers,
+    reportRows: reportRows, normalize: normalize, TIPO: TIPO
+  };
+});
