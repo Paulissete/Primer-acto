@@ -109,3 +109,4 @@ h1,h2,h3{margin:0}
 .prev.good{background:var(--green-xs);color:var(--green-d)} .prev.warn{background:var(--amber-s);color:var(--amber-ink)}
 details.more{margin:6px 0 4px} details.more summary{padding:12px 0;color:var(--muted);font-weight:600;font-size:14px;cursor:pointer}
 .sheet .row h2{margin:0}
+.notice.warn{background:var(--amber-s);color:var(--amber-ink)}

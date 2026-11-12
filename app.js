@@ -1,7 +1,7 @@
 /* Primer Acto | Cuotas y Asistencia — interfaz */
 (function () {
   'use strict';
-  var KEY = 'primerActo.v1', BAK = 'primerActo.bak';
+  var KEY = 'primerActo.v1', BAK = 'primerActo.bak', BEST = 'primerActo.best', SNAPS = 'primerActo.snaps', LASTEXP = 'primerActo.lastExport';
   var $ = function (s) { return document.querySelector(s); };
   var clp = PA.clp;
 
@@ -26,7 +26,47 @@
       if (prev && (!bak || bak.date !== today)) localStorage.setItem(BAK, JSON.stringify({ date: today, data: JSON.parse(prev) }));
       localStorage.setItem(KEY, JSON.stringify(S));
       lastSaveOk = true;
+      backupSnaps();
     } catch (e) { lastSaveOk = false; toast('⚠ No se pudo guardar. Exporta un respaldo.'); }
+  }
+  /* Copias internas: (1) la copia con MÁS registros que haya existido (nunca se reemplaza por una más vacía)
+     y (2) una copia por día de los últimos 10 días. Sirven para recuperar si algo se borra o se pisa. */
+  function wt(st) { return Object.keys(st.sessions || {}).length + (st.payments || []).length; }
+  function backupSnaps() {
+    try {
+      var t = PA.todayISO();
+      var best = JSON.parse(localStorage.getItem(BEST) || 'null');
+      if (!best || !best.data || wt(S) >= wt(best.data)) localStorage.setItem(BEST, JSON.stringify({ date: t, data: S }));
+      var snaps = JSON.parse(localStorage.getItem(SNAPS) || '[]'), i = -1;
+      snaps.forEach(function (x, n) { if (x.date === t) i = n; });
+      if (i < 0) snaps.push({ date: t, data: S }); else if (wt(S) >= wt(snaps[i].data)) snaps[i] = { date: t, data: S };
+      localStorage.setItem(SNAPS, JSON.stringify(snaps.slice(-10)));
+    } catch (e) {}
+  }
+  function describe(st) {
+    var cash = PA.sum(PA.movements(st).filter(PA.isCash));
+    return st.members.length + ' integrantes · ' + Object.keys(st.sessions).length + ' sesiones · ' + st.payments.length + ' abonos · ' + clp(cash) + ' recaudado en total';
+  }
+  function candidates() {
+    var out = [];
+    function add(label, date, data) { try { out.push({ label: label, date: date, data: PA.normalize(data) }); } catch (e) {} }
+    try { var b = JSON.parse(localStorage.getItem(BEST) || 'null'); if (b && b.data) add('Copia con más registros', b.date, b.data); } catch (e) {}
+    try { JSON.parse(localStorage.getItem(SNAPS) || '[]').reverse().forEach(function (x) { add('Copia del día', x.date, x.data); }); } catch (e) {}
+    try { var o = JSON.parse(localStorage.getItem(BAK) || 'null'); if (o && o.data) add('Copia automática anterior', o.date, o.data); } catch (e) {}
+    try { var c = localStorage.getItem('primerActo.corrupt'); if (c) add('Datos rescatados', '', JSON.parse(c)); } catch (e) {}
+    var cur = JSON.stringify(S), seen = {};
+    return out.filter(function (x) { var k = JSON.stringify(x.data); if (k === cur || seen[k]) return false; seen[k] = 1; return true; });
+  }
+  var recCands = [];
+  function homeAlert() {
+    var c = candidates();
+    if (wt(S) === 0 && c.some(function (x) { return wt(x.data) > 0; }))
+      return '<button class="notice" style="width:100%;text-align:left;margin:0 0 10px" data-act="go" data-v="settings"><b>Encontré copias con datos guardados.</b> Toca aquí para recuperarlos (Configuración → Recuperar datos).</button>';
+    var last = 0; try { last = +localStorage.getItem(LASTEXP) || 0; } catch (e) {}
+    var days = last ? Math.floor((Date.now() - last) / 86400000) : 999;
+    if (wt(S) > 0 && days >= 7)
+      return '<button class="notice warn" style="width:100%;text-align:left;margin:0 0 10px" data-act="exportJson">' + (last ? 'Hace ' + days + ' días que no haces un respaldo.' : 'Aún no has hecho un respaldo.') + ' <b>Toca aquí para guardarlo</b> en Archivos o enviártelo.</button>';
+    return '';
   }
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
 
@@ -76,7 +116,7 @@
     var month = PA.collectedInMonth(S, d.slice(0, 7));
     var susp = sm.status === 'suspended';
     return '<div class="brand">' + MASKS + '<div class="logo">Primer Acto</div><small>Colectivo de Artes Escénicas &amp; Cultura</small></div>' +
-      '<div style="text-align:right;margin-top:-34px;height:34px"><button class="iconbtn" style="display:inline-grid;font-size:20px" data-act="go" data-v="settings" aria-label="Configuración">⚙</button></div>' +
+      '<div style="text-align:right;margin-top:-34px;height:34px"><button class="iconbtn" style="display:inline-grid;font-size:20px" data-act="go" data-v="settings" aria-label="Configuración">⚙</button></div>' + homeAlert() +
       '<button class="card row" style="width:100%;text-align:left" data-act="tab" data-v="session"><div class="tile" style="border:0;padding:0"><div class="ic a">▦</div></div><div class="grow"><div class="small">' + (d === today ? 'Sesión de hoy' : d > today ? 'Próxima sesión' : 'Sesión seleccionada') + '</div><b style="font-size:18px">' + PA.fmtLong(d).replace(/^./, function (c) { return c.toUpperCase(); }) + '</b><div class="small">' + esc(S.settings.time) + ' hrs · ' + esc(S.settings.place) + '</div>' +
       (susp ? '<span class="chip r" style="margin-top:6px">Sesión suspendida</span>' : '') + '</div><span class="chev">›</span></button>' +
       '<div class="bigrow"><button class="bigbtn" data-act="tab" data-v="session">▦ Controlar sesión</button><button class="bigbtn gold" data-act="go" data-v="pay">$ Registrar pago</button></div>' +
@@ -303,10 +343,17 @@
   }
 
   /* ================= CONFIGURACIÓN ================= */
+  function recoverBlock() {
+    return '<div class="sec">Recuperar datos</div><div class="small" style="margin-bottom:8px">Ahora en la app: ' + esc(describe(S)) + '</div>' +
+      (recCands.length ? recCands.map(function (x, i) {
+        return '<div class="card"><b>' + esc(x.label) + '</b>' + (x.date ? ' <span class="small">· ' + PA.fmtShort(x.date) + '</span>' : '') + '<div class="small" style="margin:4px 0 8px">' + esc(describe(x.data)) + '</div><button class="bigbtn ghost" style="margin:0" data-act="recover" data-i="' + i + '">Restaurar esta copia</button></div>';
+      }).join('') : '<div class="small">No hay otras copias guardadas en este teléfono. Si tienes un respaldo (.json), usa “Restaurar respaldo” más abajo.</div>');
+  }
   function vSettings() {
     var st = S.settings;
     var tog = function (k, lbl) { return '<div class="tog"><span>' + lbl + '</span><button class="sw ' + (st[k] ? 'on' : '') + '" data-act="setTog" data-v="' + k + '" aria-label="' + lbl + '"></button></div>'; };
-    return top('Configuración', { back: 1 }) +
+    recCands = candidates();
+    return top('Configuración', { back: 1 }) + recoverBlock() +
       '<div class="sec">Datos generales</div><label class="f">Monto de la cuota semanal (CLP)</label><input data-in="s:fee" inputmode="numeric" value="' + st.fee + '"><div class="small" style="margin-top:4px">Un cambio aplica sólo a sesiones nuevas; las ya registradas conservan su monto.</div>' +
       '<label class="f">Lugar del taller</label><input data-in="s:place" value="' + esc(st.place) + '">' +
       '<label class="f">Día habitual</label><select data-in="s:weekday">' + PA.DIAS.map(function (d, i) { return '<option value="' + i + '"' + (st.weekday === i ? ' selected' : '') + '>' + d.charAt(0).toUpperCase() + d.slice(1) + '</option>'; }).join('') + '</select>' +
@@ -320,7 +367,7 @@
       '<button class="bigbtn ghost" data-act="importMembers">⬆ Importar nómina (CSV)</button>' +
       '<div class="small" style="margin-top:6px">Para importar desde Excel: Archivo → Guardar como → CSV. Columnas: Nombre; Apellido (opcional: Estado).</div>' +
       '<button class="bigbtn danger" data-act="wipe" style="margin-top:22px">Borrar todos los datos</button>' +
-      '<div class="small center">Primer Acto · Cuotas y Asistencia v1.1</div>';
+      '<div class="small center">Primer Acto · Cuotas y Asistencia v1.2</div>';
   }
 
   /* ================= render ================= */
@@ -429,7 +476,11 @@
       sendFile('primer-acto-nomina-' + today + '.csv', PA.toCSV(rows), 'text/csv');
     },
     importMembers: function () { $('#fileCsv').click(); },
-    exportJson: function () { sendFile('primer-acto-respaldo-' + today + '.json', JSON.stringify(S, null, 1), 'application/json'); },
+    recover: function (d) {
+      var x = recCands[+d.i]; if (!x) return;
+      confirmBox('¿Restaurar esta copia?', esc(describe(x.data)) + '.<br>Reemplaza los datos actuales (la copia con más registros se conserva).', 'Restaurar', function () { S = x.data; save(); closeModal(); tab('home'); toast('Copia restaurada ✓'); });
+    },
+    exportJson: function () { try { localStorage.setItem(LASTEXP, String(Date.now())); } catch (e) {} sendFile('primer-acto-respaldo-' + today + '.json', JSON.stringify(S, null, 1), 'application/json'); },
     importJson: function () { $('#fileJson').click(); },
     setTog: function (d) { S.settings[d.v] = !S.settings[d.v]; save(); render(); },
     wipe: function () {

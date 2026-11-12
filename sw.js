@@ -1,6 +1,6 @@
 /* Service worker: sólo guarda en caché los archivos de la app (para abrirla sin internet).
    Los datos viven en localStorage y NUNCA son tocados por este archivo ni por las actualizaciones. */
-var CACHE = 'primer-acto-v2';
+var CACHE = 'primer-acto-v3';
 var FILES = ['./', './index.html', './styles.css', './logic.js', './app.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
